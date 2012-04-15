@@ -8,7 +8,7 @@
 #define NRF_ADDRESS_LENGTH                  6
 #define NRF_PASSKEY_LENGTH                  6
 #define NRF_PIPE_ERROR_LENGTH               27
-#define NRF_DATA_RECEIVED_LENGTH            20
+#define NRF_DATA_LENGTH                     20
 #define NRF_DYNAMIC_DATA_LENGTH             27
 #define NRF_SETUP_DATA_LENGTH               30
 
@@ -83,5 +83,11 @@
 #define NRF_STATUS_ERROR_PIPE_STATE_INVALID 0x96
 #define NRF_STATUS_ERROR_INVALID_KEY_SIZE   0x97
 #define NRF_STATUS_ERROR_INVALID_KEY_DATA   0x98
+
+#define NRF_STATE_SETUP         1
+#define NRF_STATE_STANDBY       2
+#define NRF_STATE_ACTIVE        3
+#define NRF_STATE_TEST          4
+#define NRF_STATE_SLEEP         5
 
 #endif /* _NRF8001_CONSTANTS_H */

@@ -37,12 +37,12 @@ typedef struct {
             uint16_t timeout;
         } changeTimingRequest;
 
-        uint8_t servicePipeNumber;
+        nrf_pipe_t servicePipeNo;
 
         uint16_t dtmCommand;
 
         struct {
-            uint8_t sequenceNumber;
+            uint8_t sequenceNo;
             uint8_t setupData[NRF_DYNAMIC_DATA_LENGTH];
         } writeDynamicData;
 
@@ -62,10 +62,21 @@ typedef struct {
             uint16_t timeout;
             uint16_t advInterval;
         } broadcast;
+
+        struct {
+            uint8_t servicePipeNo;
+            uint8_t data[NRF_DATA_LENGTH];
+        } data;
+
+        struct {
+            uint8_t servicePipeNo;
+            uint8_t errorCode;
+        } sendDataNack;
     } content;
 } nRFCommand;
 
 typedef struct {
+    uint8_t debug;
     uint8_t length;
     uint8_t event;
     
@@ -82,7 +93,7 @@ typedef struct {
         uint8_t echo[NRF_MAX_ECHO_MESSAGE_LENGTH];
         
         struct {
-            uint16_t lineNumber;
+            uint16_t lineNo;
             uint8_t fileName[NRF_FIRMWARE_FILENAME_LENGTH];
         } hardwareError;
         
@@ -126,7 +137,6 @@ typedef struct {
             uint16_t slaveLatency;
             uint16_t supervisionTimeout;
             uint8_t masterClockAccuracy;
-
         } connected;
 
         struct {
@@ -168,11 +178,9 @@ typedef struct {
         } pipeError;
 
         struct {
-            uint8_t servicePipeNo;
-            uint8_t data[NRF_DATA_RECEIVED_LENGTH];
+            nrf_pipe_t servicePipeNo;
+            uint8_t data[NRF_DATA_LENGTH];
         } dataReceived;
-
-        uint8_t servicePipeNo;
     } msg;
 } nRFEvent;
 
