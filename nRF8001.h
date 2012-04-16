@@ -21,16 +21,11 @@ typedef struct {
 // event handler
 typedef void (*nRFEventHandler) (nRFEvent *);
 
-// internal state
-typedef enum {
-    RXONLY,
-    RXTX,
-    RXWAIT,
-    TXWAIT
-} nRFSpiState;
-
 class nRF8001
 {
+    private:
+        static nrf_tx_status_t transmit(nRFCommand *txCmd);
+
     public:
         static void spiByteISR();
 

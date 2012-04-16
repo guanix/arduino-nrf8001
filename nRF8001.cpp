@@ -4,9 +4,16 @@
 #include <avr/interrupt.h>
 #include "nRF8001.h"
 #include "services.h"
-#include "LightweightRingBuff.h"
 
 hal_aci_data_t setup_msgs[NB_SETUP_MESSAGES] = SETUP_MESSAGES_CONTENT;
+
+// internal state
+typedef enum {
+    RXONLY,
+    RXTX,
+    RXWAIT,
+    TXWAIT
+} nRFSpiState;
 
 // We keep all this as file static because of problems accessing
 // class variables from interrupt handlers
@@ -21,23 +28,24 @@ static volatile uint8_t nextSetup;
 static volatile uint8_t nextByte;
 static volatile uint8_t rxLength;
 static nRFCommand txBuffer;
-static RingBuff_t rxRingBuffer;
-static uint8_t deviceState;
+static nRFEvent rxBuffer;
+static nrf_state_t deviceState;
 
 // Ring buffer of nRFE
-static nRFEvent rxBuffers[NRF_RX_BUFFERS];
-static volatile nRFEvent *rxBuffersIn;
-static volatile nRFEvent *rxBuffersOut;
-static volatile uint8_t rxBuffersCount;
+static nRFEvent rxRingBuffer[NRF_RX_BUFFERS];
+static volatile nRFEvent *rxRingBufferIn;
+static volatile nRFEvent *rxRingBufferOut;
+static volatile uint8_t rxRingBufferCount;
 
 inline void rdynLowISR();
 
-void loadSetupMessage()
+void sendSetupMessage()
 {
     memset(&txBuffer, 0, sizeof(nRFEvent));
     memcpy(&txBuffer, setup_msgs[nextSetup++].buffer, NRF_MAX_PACKET_LENGTH);
 
     spiState = TXWAIT;
+    digitalWrite(reqn_pin, LOW);
 }
 
 void nRF8001::setup(uint8_t reset_pin_arg,
@@ -53,19 +61,17 @@ void nRF8001::setup(uint8_t reset_pin_arg,
     rdyn_int = rdyn_int_arg;
     listener = eventHandler;
 
-    memset(&rxBuffers, 0, sizeof(nRFEvent)*NRF_RX_BUFFERS);
-    memset(&rxRingBuffer, 0, sizeof(RingBuff_t));
+    memset(&rxRingBuffer, 0, sizeof(nRFEvent)*NRF_RX_BUFFERS);
+    memset(&rxBuffer, 0, sizeof(nRFEvent));
     memset(&txBuffer, 0, sizeof(nRFCommand));
 
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        rxBuffersIn = rxBuffers;
-        rxBuffersOut = rxBuffers;
-        rxBuffersCount = 0;
+        rxRingBufferIn = rxRingBuffer;
+        rxRingBufferOut = rxRingBuffer;
+        rxRingBufferCount = 0;
     }
 
-    RingBuffer_InitBuffer(&rxRingBuffer);
-
-    deviceState = NRF_STATE_SETUP;
+    deviceState = Setup;
     spiState = RXONLY;
     nextByte = rxLength = credits = nextSetup = 0;
 
@@ -85,7 +91,7 @@ void nRF8001::setup(uint8_t reset_pin_arg,
 
     // Load up the first setup message
     assert(NB_SETUP_MESSAGES > 0);
-    loadSetupMessage();
+    sendSetupMessage();
 
     // Start interrupts
     attachInterrupt(0, rdynLowISR, FALLING);
@@ -95,9 +101,13 @@ void nRF8001::setup(uint8_t reset_pin_arg,
 // Interrupt handlers
 inline void rdynLowISR()
 {
+    deviceState = Active;
+    rdynHigh = 0;
+
     // set spiState and send the first byte
     if (spiState == RXWAIT) {
         spiState = RXONLY;
+        digitalWrite(reqn_pin, LOW);
         SPDR = 0;
     } else if (spiState == TXWAIT) {
         spiState = RXTX;
@@ -108,14 +118,56 @@ inline void rdynLowISR()
     }
 }
 
+nrf_tx_status_t transmit(nRFCommand *txCmd)
+{
+    // Are we in a state where we can transmit?
+    if (deviceState == Setup || deviceState == Active || spiState != RXWAIT) {
+        return InvalidState;
+    }
+
+    // Enough credits?
+    if (txCmd->command == NRF_SENDDATA_OP
+     || txCmd->command == NRF_REQUESTDATA_OP
+     || txCmd->command == NRF_SETLOCALDATA_OP
+     || txCmd->command == NRF_SETDATAACK_OP
+     || txCmd->command == NRF_SENDDATANACK_OP) {
+        if (credits-- < 1) {
+            return InsufficientCredits;
+        }
+    }
+
+    // Clear and copy to TX buffer
+    memset(&txBuffer, 0, sizeof(nRFCommand));
+    memcpy(&txBuffer, txCmd, txCmd->length + 1);
+
+    // Bring REQN low
+    spiState = TXWAIT;
+    digitalWrite(reqn_pin, LOW);
+
+    return Success;
+}
+
 ISR(SPI_STC_vect)
 {
-    RingBuffer_Insert(&rxRingBuffer, SPDR);
+    nRFEvent *rxEvent;
+
+    ((uint8_t *)&rxBuffer)[nextByte] = SPDR;
+
+    // TODO: check that we are in the right state
 
     if (nextByte == 1) {
-        rxLength = SPDR;
+        // I have no idea whether it's a bad idea to double-read SPDR,
+        // but assuming that it is, this saves us a byte of memory.
+        rxLength = ((uint8_t *)&rxBuffer)[nextByte];
+        if (rxLength > 30) {
+            // Length too long, there's something wrong
+            spiState = RXWAIT;
+            digitalWrite(reqn_pin, HIGH);
+            return;
+        }
     }
     
+    // TODO: optimize by precalculating these decisions as a bitmap
     if (spiState == RXTX && nextByte + 1 < txBuffer.length + 1) {
         // there is something to transmit
         SPDR = ((uint8_t *)&txBuffer)[nextByte + 1];
@@ -127,21 +179,53 @@ ISR(SPI_STC_vect)
         noInterrupts();
         digitalWrite(reqn_pin, HIGH);
 
+        // wait until RDYN goes high again
+        while (digitalRead(rdyn_pin) == LOW);
+
         // basic housekeeping
         spiState = RXWAIT;
         rxLength = nextByte = 0;
-        memset(&txBuffer, 0, sizeof(nRFCommand));
-        memset(&rxRingBuffer, 0, sizeof(RingBuff_t));
-        RingBuffer_InitBuffer(&rxRingBuffer);
         
-        // manage credits TODO
-
-        // special setup stage handling
-        if (deviceState == NRF_STATE_SETUP && nextSetup < NB_SETUP_MESSAGES) {
-            loadSetupMessage();
+        // manage credits
+        if (rxBuffer.event == NRF_DATACREDITEVENT) {
+            credits += rxBuffer.msg.dataCredits;
         }
 
-        interrupts();
+        if (rxBuffer.event == NRF_COMMANDRESPONSEEVENT
+&& rxBuffer.msg.commandResponse.opcode == NRF_STATUS_TRANSACTION_CONTINUE) {
+            // queue up the next setup message
+            sendSetupMessage();
+        }
+
+        if (rxBuffer.event == NRF_DEVICESTARTEDEVENT) {
+            credits = rxBuffer.msg.deviceStarted.dataCreditAvailable;
+            deviceState = Standby;
+        }
+
+        if (txBuffer.command == NRF_SLEEP_OP) {
+            deviceState = Sleep;
+        }
+
+        // copy into ring buffer of nRFEvent objects
+        memcpy(&rxRingBufferIn, &rxBuffer, sizeof(nRFEvent));
+        rxRingBufferIn += sizeof(nRFEvent);
+        if (rxRingBufferIn == rxRingBuffer + NRF_RX_BUFFERS*sizeof(nRFEvent)) {
+            rxRingBufferIn = rxRingBuffer;
+        }
+        rxRingBufferCount++;
+        memset(&rxBuffer, 0, sizeof(nRFEvent));
+        // save some cycles here by clearing the tx buffer when transmitting
+
+        // Did RDYN go high, then low again? invoke the ISR, we missed an
+        // interrupt while we monkeyed around
+        if (digitalRead(rdyn_pin) == LOW) {
+            // timing is everything
+            interrupts();
+            rdynLowISR();
+        } else {
+            interrupts();
+        }
+
     }
 
     nextByte++;
