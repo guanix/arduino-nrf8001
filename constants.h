@@ -1,6 +1,10 @@
 #ifndef _NRF8001_CONSTANTS_H
 #define _NRF8001_CONSTANTS_H
 
+// Don't use enums for this because we use these values in structs that
+// data structures transferred over the wire, and we need to be absolutely
+// certain of their sizes.
+
 #define NRF_MAX_PACKET_LENGTH               32
 #define NRF_MAX_ECHO_MESSAGE_LENGTH         29
 #define NRF_FIRMWARE_FILENAME_LENGTH        22
@@ -39,6 +43,7 @@
 #define NRF_SETTXPOWER_OP           0x12
 #define NRF_GETDEVICEADDRESS_OP     0x0a
 #define NRF_CONNECT_OP              0x0f
+#define NRF_RADIORESET_OP           0x0e
 #define NRF_BOND_OP                 0x10
 #define NRF_DISCONNECT_OP           0x11
 #define NRF_CHANGETIMINGREQUEST_OP  0x13
@@ -47,12 +52,19 @@
 #define NRF_DTMCOMMAND_OP           0x03
 #define NRF_READDYNAMICDATA_OP      0x07
 #define NRF_WRITEDYNAMICDATA_OP     0x08
-#define NRF_RADIORESET_OP           0x0e
 #define NRF_SETAPPLICATIONLATENCY_OP 0x19
 #define NRF_SETKEY_OP               0x1a
 #define NRF_OPENADVPIPE_OP          0x1b
 #define NRF_BROADCAST_OP            0x1c
 #define NRF_BONDSECREQUEST_OP       0x1d
+#define NRF_DIRECTEDCONNECT_OP      0x1e
+
+// Data commands
+#define NRF_SENDDATA_OP             0x15
+#define NRF_REQUESTDATA_OP          0x17
+#define NRF_SETLOCALDATA_OP         0x0d
+#define NRF_SETDATAACK_OP           0x16
+#define NRF_SENDDATANACK_OP         0x18
 
 #define NRF_STATUS_SUCCESS                  0x00
 #define NRF_STATUS_TRANSACTION_CONTINUE     0x01
@@ -84,10 +96,18 @@
 #define NRF_STATUS_ERROR_INVALID_KEY_SIZE   0x97
 #define NRF_STATUS_ERROR_INVALID_KEY_DATA   0x98
 
-#define NRF_STATE_SETUP         1
-#define NRF_STATE_STANDBY       2
-#define NRF_STATE_ACTIVE        3
-#define NRF_STATE_TEST          4
-#define NRF_STATE_SLEEP         5
+typedef enum {
+    Setup,
+    Standby,
+    Active,
+    Test,
+    Sleep
+} nrf_state_t;
+
+typedef enum {
+    Success             = 0,
+    InvalidState        = 1,
+    InsufficientCredits = 2
+} nrf_tx_status_t;
 
 #endif /* _NRF8001_CONSTANTS_H */
