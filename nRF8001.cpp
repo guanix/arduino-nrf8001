@@ -153,7 +153,16 @@ ISR(SPI_STC_vect)
 
     ((uint8_t *)&rxBuffer)[nextByte] = SPDR;
 
-    // TODO: check that we are in the right state
+    if (spiState == TXWAIT || spiState == RXWAIT) {
+        // we are not in a state where we should be receiving bytes
+        // clean up a little and pull REQN high
+        noInterrupts();
+        rxLength = nextByte = 0;
+        memset(&rxBuffer, 0, sizeof(nRFEvent));
+        interrupts();
+        digitalWrite(REQN, HIGH);
+        return;
+    }
 
     if (nextByte == 1) {
         // I have no idea whether it's a bad idea to double-read SPDR,
