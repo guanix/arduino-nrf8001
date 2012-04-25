@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <assert.h>
-#include <SPI.h>
 #include <avr/interrupt.h>
 #include "nRF8001.h"
 #include "services.h"
@@ -38,17 +37,31 @@ static volatile nRFEvent *rxRingBufferOut;
 static volatile uint8_t rxRingBufferCount;
 
 inline void rdynLowISR();
+nrf_tx_status_t transmit(nRFCommand *txCmd);
+
+nrf_state_t nRF8001Class::getDeviceState()
+{
+    return deviceState;
+}
 
 void sendSetupMessage()
 {
+#if NRF_DEBUG
+    Serial.print("sending setup message number ");
+    Serial.println(nextSetup);
+    Serial.print("spiState = ");
+    Serial.println(spiState);
+#endif
     memset(&txBuffer, 0, sizeof(nRFEvent));
     memcpy(&txBuffer, setup_msgs[nextSetup++].buffer, NRF_MAX_PACKET_LENGTH);
+
+    while (spiState != RXWAIT);
 
     spiState = TXWAIT;
     digitalWrite(reqn_pin, LOW);
 }
 
-void nRF8001::setup(uint8_t reset_pin_arg,
+void nRF8001Class::setup(uint8_t reset_pin_arg,
                     uint8_t reqn_pin_arg,
                     uint8_t rdyn_pin_arg,
                     uint8_t rdyn_int_arg,
@@ -65,11 +78,9 @@ void nRF8001::setup(uint8_t reset_pin_arg,
     memset(&rxBuffer, 0, sizeof(nRFEvent));
     memset(&txBuffer, 0, sizeof(nRFCommand));
 
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        rxRingBufferIn = rxRingBuffer;
-        rxRingBufferOut = rxRingBuffer;
-        rxRingBufferCount = 0;
-    }
+    rxRingBufferIn = rxRingBuffer;
+    rxRingBufferOut = rxRingBuffer;
+    rxRingBufferCount = 0;
 
     deviceState = Setup;
     spiState = RXONLY;
@@ -82,27 +93,44 @@ void nRF8001::setup(uint8_t reset_pin_arg,
     digitalWrite(reqn_pin, HIGH);
 
     pinMode(reset_pin, OUTPUT);
-    pinMode(reset_pin, HIGH);
+    digitalWrite(reset_pin, LOW);
+    delayMicroseconds(1);
+    digitalWrite(reset_pin, HIGH);
 
-    SPI.setDataMode(SPI_MODE0);
-    SPI.setBitOrder(LSBFIRST);
-    SPI.setClockDivider(SPI_CLOCK_DIV16);
-    SPI.begin();
+    // inialize SPI
+    pinMode(SCK, OUTPUT);
+    pinMode(MOSI, OUTPUT);
+    pinMode(SS, OUTPUT);
 
-    // Load up the first setup message
-    assert(NB_SETUP_MESSAGES > 0);
-    sendSetupMessage();
+    digitalWrite(SCK, LOW);
+    digitalWrite(MOSI, LOW);
+    digitalWrite(SS, HIGH);
 
-    // Start interrupts
+    // SPI mode 0; /16 clock divider
+    SPCR = _BV(SPIE) | _BV(SPE) | _BV(DORD) | _BV(MSTR) | _BV(SPR0);
+
+    // Load up the first setup message and start interrupts
+#if NB_SETUP_MESSAGES < 1
+#error Make sure you included devices.h from nRFgo Studio
+#endif
     attachInterrupt(0, rdynLowISR, FALLING);
     interrupts();
+
+#if NRF_DEBUG
+    Serial.println("Ready to send first setup message");
+#endif
+    sendSetupMessage();
 }
 
 // Interrupt handlers
 inline void rdynLowISR()
 {
+#if NRF_DEBUG
+    Serial.print("I");
+    Serial.println(spiState);
+#endif
+
     deviceState = Active;
-    rdynHigh = 0;
 
     // set spiState and send the first byte
     if (spiState == RXWAIT) {
@@ -151,16 +179,23 @@ ISR(SPI_STC_vect)
 {
     nRFEvent *rxEvent;
 
+#if NRF_DEBUG
+    Serial.println("S");
+#endif
+
     ((uint8_t *)&rxBuffer)[nextByte] = SPDR;
 
     if (spiState == TXWAIT || spiState == RXWAIT) {
         // we are not in a state where we should be receiving bytes
         // clean up a little and pull REQN high
         noInterrupts();
+#if NRF_DEBUG
+        Serial.println("wrong state for SPI STC");
+#endif
         rxLength = nextByte = 0;
         memset(&rxBuffer, 0, sizeof(nRFEvent));
         interrupts();
-        digitalWrite(REQN, HIGH);
+        digitalWrite(reqn_pin, HIGH);
         return;
     }
 
@@ -178,18 +213,26 @@ ISR(SPI_STC_vect)
     
     // TODO: optimize by precalculating these decisions as a bitmap
     if (spiState == RXTX && nextByte + 1 < txBuffer.length + 1) {
+#if NRF_DEBUG
+        Serial.println("T");
+#endif
         // there is something to transmit
         SPDR = ((uint8_t *)&txBuffer)[nextByte + 1];
     } else if (rxLength > 0 && nextByte + 1 < rxLength + 2) {
+#if NRF_DEBUG
+        Serial.println("S");
+#endif
         // receive only
         SPDR = 0;
     } else {
         // we are done!
         noInterrupts();
+#if NRF_DEBUG
+        Serial.println("transaction done");
+        Serial.print("event: ");
+        Serial.println(rxBuffer.event, HEX);
+#endif
         digitalWrite(reqn_pin, HIGH);
-
-        // wait until RDYN goes high again
-        while (digitalRead(rdyn_pin) == LOW);
 
         // basic housekeeping
         spiState = RXWAIT;
@@ -203,12 +246,19 @@ ISR(SPI_STC_vect)
         if (rxBuffer.event == NRF_COMMANDRESPONSEEVENT
 && rxBuffer.msg.commandResponse.opcode == NRF_STATUS_TRANSACTION_CONTINUE) {
             // queue up the next setup message
-            sendSetupMessage();
+#if NRF_DEBUG
+            Serial.println("Sending next setup message");
+#endif
+            memset(&rxBuffer, 0, sizeof(nRFEvent));
+            interrupts();
+            return sendSetupMessage();
         }
 
         if (rxBuffer.event == NRF_DEVICESTARTEDEVENT) {
+#if NRF_DEBUG
+            Serial.println("Device started");
+#endif
             credits = rxBuffer.msg.deviceStarted.dataCreditAvailable;
-            deviceState = Standby;
         }
 
         if (txBuffer.command == NRF_SLEEP_OP) {
@@ -228,14 +278,21 @@ ISR(SPI_STC_vect)
         // Did RDYN go high, then low again? invoke the ISR, we missed an
         // interrupt while we monkeyed around
         if (digitalRead(rdyn_pin) == LOW) {
+#if NRF_DEBUG
+            Serial.println("rdyn went low again");
+#endif
             // timing is everything
             interrupts();
-            rdynLowISR();
+            return rdynLowISR();
         } else {
+#if NRF_DEBUG
+            Serial.println("rdyn did not go low again");
+#endif
             interrupts();
         }
-
     }
+
+    Serial.println("D");
 
     nextByte++;
 }

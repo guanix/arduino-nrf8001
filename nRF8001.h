@@ -3,13 +3,14 @@
 #ifndef _NRF8001_H
 #define _NRF8001_H
 
+#define NRF_DEBUG 1
+
 typedef uint8_t nrf_cmd_t;
 typedef uint8_t nrf_len_t;
 typedef uint8_t nrf_pipe_t;
 
 #include "constants.h"
 #include "data.h" // data structures for requests and responses
-#include "LightweightRingBuff.h"
 
 typedef struct {
     uint8_t status_byte;
@@ -21,12 +22,14 @@ typedef struct {
 // event handler
 typedef void (*nRFEventHandler) (nRFEvent *);
 
-class nRF8001
+class nRF8001Class
 {
     private:
         static nrf_tx_status_t transmit(nRFCommand *txCmd);
 
     public:
+        static nrf_state_t getDeviceState();
+
         static void spiByteISR();
 
         static void setup(uint8_t reset_pin,
@@ -80,5 +83,7 @@ class nRF8001
         static nrf_cmd_t sendDataNack(nrf_pipe_t servicePipeNo,
                                       uint8_t errorCode);
 };
+
+extern nRF8001Class nRF8001;
 
 #endif /* _NRF8001_H */
