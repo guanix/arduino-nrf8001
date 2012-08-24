@@ -3,7 +3,7 @@
 #ifndef _NRF8001_DATA_H
 #define _NRF8001_DATA_H
 
-typedef struct {
+struct nRFCommand {
     uint8_t length;
     uint8_t command;
 
@@ -37,7 +37,7 @@ typedef struct {
             uint16_t timeout;
         } changeTimingRequest;
 
-        nrf_pipe_t servicePipeNo;
+        nRFPipe servicePipeNo;
 
         uint16_t dtmCommand;
 
@@ -73,9 +73,9 @@ typedef struct {
             uint8_t errorCode;
         } sendDataNack;
     } content;
-} nRFCommand;
+};
 
-typedef struct {
+struct nRFEvent {
     uint8_t debug;
     uint8_t length;
     uint8_t event;
@@ -178,10 +178,10 @@ typedef struct {
         } pipeError;
 
         struct {
-            nrf_pipe_t servicePipeNo;
+            nRFPipe servicePipeNo;
             uint8_t data[NRF_DATA_LENGTH];
         } dataReceived;
     } msg;
-} nRFEvent;
+};
 
 #endif /* _NRF8001_DATA_H */

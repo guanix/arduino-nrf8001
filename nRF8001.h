@@ -3,11 +3,13 @@
 #ifndef _NRF8001_H
 #define _NRF8001_H
 
-#define NRF_DEBUG 1
+#ifndef NRF_DEBUG
+#define NRF_DEBUG 0
+#endif
 
-typedef uint8_t nrf_cmd_t;
-typedef uint8_t nrf_len_t;
-typedef uint8_t nrf_pipe_t;
+typedef uint8_t nRFCmd;
+typedef uint8_t nRFLen;
+typedef uint8_t nRFPipe;
 
 #include "constants.h"
 #include "data.h" // data structures for requests and responses
@@ -19,71 +21,83 @@ typedef struct {
 
 #define NRF_RX_BUFFERS 5
 
+#if NRF_DEBUG
+#define nrf_debug(msg) Serial.println(F(msg))
+#else
+#define nrf_debug(msg)
+#endif
+
 // event handler
 typedef void (*nRFEventHandler) (nRFEvent *);
 
-class nRF8001Class
+class nRF8001
 {
     private:
-        static nrf_tx_status_t transmit(nRFCommand *txCmd);
+        uint8_t reset_pin;
+        uint8_t reqn_pin;
+        uint8_t rdyn_pin;
+        nRFEventHandler listener;
+        nRFSpiState spiState;
+        uint8_t credits;
+        nRFDeviceState deviceState;
+
+        nRFTxStatus transmit(nRFCommand *txCmd);
+        void sendSetupMessages();
 
     public:
-        static nrf_state_t getDeviceState();
+        nRFDeviceState getDeviceState();
 
-        static void spiByteISR();
+        void spiByteISR();
 
-        static void setup(uint8_t reset_pin,
-                          uint8_t reqn_pin,
-                          uint8_t rdyn_pin,
-                          uint8_t rdyn_int,
-                          nRFEventHandler eventHandler);
+        nRF8001(uint8_t reset_pin,
+                   uint8_t reqn_pin,
+                   uint8_t rdyn_pin,
+                   nRFEventHandler eventHandler);
 
-        static uint8_t txReady();
-        static uint8_t txDataReady();
+        uint8_t txReady();
+        uint8_t txDataReady();
 
-        static nrf_cmd_t test(uint8_t feature);
-        static nrf_cmd_t sleep();
-        static nrf_cmd_t getDeviceVersion();
-        static nrf_cmd_t echo(nrf_len_t dataLength, uint8_t *data);
-        static nrf_cmd_t wakeup();
-        static nrf_cmd_t getBatteryLevel();
-        static nrf_cmd_t getTemperature();
-        static nrf_cmd_t setup(nrf_len_t dataLength, uint8_t *setupData);
-        static nrf_cmd_t setTxPower(uint8_t powerLevel);
-        static nrf_cmd_t getDeviceAddress();
-        static nrf_cmd_t connect(uint16_t timeout, uint16_t advInterval);
-        static nrf_cmd_t radioReset();
-        static nrf_cmd_t bond(uint16_t timeout, uint16_t advInterval);
-        static nrf_cmd_t disconnect(uint8_t reason);
-        static nrf_cmd_t changeTimingRequest(uint16_t intervalMin,
-                                             uint16_t intervalMax,
-                                             uint16_t slaveLatency,
-                                             uint16_t timeout);
-        static nrf_cmd_t openRemotePipe(nrf_pipe_t servicePipeNo);
-        static nrf_cmd_t closeRemotePipe(nrf_pipe_t servicePipeNo);
-        static nrf_cmd_t dtmCommand(uint16_t dtmCmd);
-        static nrf_cmd_t writeDynamicData(uint8_t seqNo,
-                                          nrf_len_t dataLength,
-                                          uint8_t *data);
-        static nrf_cmd_t setApplLatency(uint8_t applLatencyMode,
-                                        uint16_t latency);
-        static nrf_cmd_t setKey(uint8_t keyType, uint8_t *key);
-        static nrf_cmd_t openAdvPipe(uint64_t advServiceDataPipes);
-        static nrf_cmd_t broadcast(uint16_t timeout, uint16_t advInterval);
-        static nrf_cmd_t bondSecurityRequest();
-        static nrf_cmd_t directedConnect();
-        static nrf_cmd_t sendData(nrf_pipe_t servicePipeNo,
-                                  nrf_len_t dataLength,
-                                  uint8_t *data);
-        static nrf_cmd_t requestData(nrf_pipe_t servicePipeNo);
-        static nrf_cmd_t setLocalData(nrf_pipe_t servicePipeNo,
-                                      nrf_len_t dataLength,
-                                      uint8_t data);
-        static nrf_cmd_t sendDataAck(nrf_pipe_t servicePipeNo);
-        static nrf_cmd_t sendDataNack(nrf_pipe_t servicePipeNo,
-                                      uint8_t errorCode);
+        nRFCmd test(uint8_t feature);
+        nRFCmd sleep();
+        nRFCmd getDeviceVersion();
+        nRFCmd echo(nRFLen dataLength, uint8_t *data);
+        nRFCmd wakeup();
+        nRFCmd getBatteryLevel();
+        nRFCmd getTemperature();
+        nRFCmd setup(nRFLen dataLength, uint8_t *setupData);
+        nRFCmd setTxPower(uint8_t powerLevel);
+        nRFCmd getDeviceAddress();
+        nRFCmd connect(uint16_t timeout, uint16_t advInterval);
+        nRFCmd radioReset();
+        nRFCmd bond(uint16_t timeout, uint16_t advInterval);
+        nRFCmd disconnect(uint8_t reason);
+        nRFCmd changeTimingRequest(uint16_t intervalMin,
+                                   uint16_t intervalMax,
+                                   uint16_t slaveLatency,
+                                   uint16_t timeout);
+        nRFCmd openRemotePipe(nRFPipe servicePipeNo);
+        nRFCmd closeRemotePipe(nRFPipe servicePipeNo);
+        nRFCmd dtmCommand(uint16_t dtmCmd);
+        nRFCmd writeDynamicData(uint8_t seqNo,
+                                   nRFLen dataLength,
+                                   uint8_t *data);
+        nRFCmd setApplLatency(uint8_t applLatencyMode,
+                                 uint16_t latency);
+        nRFCmd setKey(uint8_t keyType, uint8_t *key);
+        nRFCmd openAdvPipe(uint64_t advServiceDataPipes);
+        nRFCmd broadcast(uint16_t timeout, uint16_t advInterval);
+        nRFCmd bondSecurityRequest();
+        nRFCmd directedConnect();
+        nRFCmd sendData(nRFPipe servicePipeNo,
+                           nRFLen dataLength,
+                           uint8_t *data);
+        nRFCmd requestData(nRFPipe servicePipeNo);
+        nRFCmd setLocalData(nRFPipe servicePipeNo,
+                               nRFLen dataLength,
+                               uint8_t data);
+        nRFCmd sendDataAck(nRFPipe servicePipeNo);
+        nRFCmd sendDataNack(nRFPipe servicePipeNo,
+                               uint8_t errorCode);
 };
-
-extern nRF8001Class nRF8001;
 
 #endif /* _NRF8001_H */

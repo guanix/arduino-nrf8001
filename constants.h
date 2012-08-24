@@ -96,18 +96,26 @@
 #define NRF_STATUS_ERROR_INVALID_KEY_SIZE   0x97
 #define NRF_STATUS_ERROR_INVALID_KEY_DATA   0x98
 
-typedef enum {
+enum nRFDeviceState {
     Setup,
     Standby,
     Active,
     Test,
     Sleep
-} nrf_state_t;
+};
 
-typedef enum {
+enum nRFTxStatus {
     Success             = 0,
     InvalidState        = 1,
     InsufficientCredits = 2
-} nrf_tx_status_t;
+};
+
+// internal state
+enum nRFSpiState {
+    RXONLY,
+    RXTX,
+    RXWAIT,
+    TXWAIT
+};
 
 #endif /* _NRF8001_CONSTANTS_H */
