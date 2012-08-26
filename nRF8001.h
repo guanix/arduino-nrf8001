@@ -1,7 +1,7 @@
-#include <Arduino.h>
-
 #ifndef _NRF8001_H
 #define _NRF8001_H
+
+#include <Arduino.h>
 
 #ifndef NRF_DEBUG
 #define NRF_DEBUG 0
@@ -37,25 +37,19 @@ class nRF8001
         uint8_t reqn_pin;
         uint8_t rdyn_pin;
         nRFEventHandler listener;
-        nRFSpiState spiState;
         uint8_t credits;
         nRFDeviceState deviceState;
 
-        nRFTxStatus transmit(nRFCommand *txCmd);
+        nRFTxStatus transmitReceive(nRFCommand *txCmd);
         void sendSetupMessages();
 
     public:
         nRFDeviceState getDeviceState();
 
-        void spiByteISR();
-
         nRF8001(uint8_t reset_pin,
                    uint8_t reqn_pin,
                    uint8_t rdyn_pin,
                    nRFEventHandler eventHandler);
-
-        uint8_t txReady();
-        uint8_t txDataReady();
 
         nRFCmd test(uint8_t feature);
         nRFCmd sleep();
