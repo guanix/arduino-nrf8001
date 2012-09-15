@@ -637,11 +637,17 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
 
     if (txLength > 0 || timeout == 0) {
         // Wait for RDYN low indefinitely
+        nrf_debug("waiting for RDYN low indefinitely");
         while (digitalRead(rdyn_pin) == HIGH);
     } else {
+#if NRF_DEBUG
+        Serial.print("polling for ");
+        Serial.print(timeout);
+        Serial.println("ms");
+#endif
         uint8_t rdy = 0;
         // Wait for RDYN low for 1 ms at a time
-        for (uint8_t waitPeriods = 0; waitPeriods < timeout; waitPeriods++) {
+        for (uint16_t waitPeriods = 0; waitPeriods < timeout; waitPeriods++) {
             if (digitalRead(rdyn_pin) == LOW) {
                 rdy = 1;
                 break;
@@ -733,6 +739,12 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
                         nextSetupMessage = -1;
                     }
                     break;
+                case NRF_GETTEMPERATURE_OP:
+                    if (temperatureHandler != 0) {
+                        temperatureHandler(rxEvent->msg.commandResponse
+                            .data.temperature / 4.0);
+                    }
+                    break;
             }
 
             // Dispatch event
@@ -756,6 +768,7 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
 
     // Dispatch event
     if (listener != 0) {
+        // first to generic handler
         listener(rxEvent);
     }
 
@@ -835,6 +848,11 @@ nRFConnectionStatus nRF8001::getConnectionStatus()
     return connectionStatus;
 }
 
+void nRF8001::setTemperatureHandler(nRFTemperatureHandler handler)
+{
+    temperatureHandler = handler;
+}
+
 nRFCmd nRF8001::sendData(nRFPipe servicePipeNo,
     nRFLen dataLength, uint8_t *data)
 {
@@ -869,4 +887,5 @@ nRFCmd nRF8001::sendData(nRFPipe servicePipeNo,
     cmd.content.data.servicePipeNo = servicePipeNo;
     memcpy(cmd.content.data.data, data, dataLength);
     transmitReceive(&cmd, 0);
+    return cmdSuccess;
 }

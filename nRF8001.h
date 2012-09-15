@@ -28,8 +28,30 @@ typedef struct {
 #define nrf_debugnl(msg)
 #endif
 
-// event handler
+// event handlers
 typedef void (*nRFEventHandler) (nRFEvent *);
+typedef void (*nRFCommandResponseHandler) (uint8_t opcode, uint8_t status);
+typedef void (*nRFTemperatureHandler) (float tempC);
+typedef void (*nRFBatteryLevelHandler) (float voltage);
+typedef void (*nRFDeviceVersionHandler) (uint16_t configId,
+    uint8_t aciVersion, uint8_t setupFormat, uint8_t configStatus);
+typedef void (*nRFDeviceAddressHandler) (uint8_t *address,
+    uint8_t addressType);
+typedef void (*nRFDtmHandler) (uint8_t dtmEvent);
+typedef void (*nRFDynamicDataHandler) (uint8_t seqNo, uint8_t *data);
+typedef void (*nRFConnectedHandler) (uint8_t addressType, uint8_t *peerAddress,
+    void *connectionData);
+typedef void (*nRFDisconnectedHandler) (uint8_t aciStatus, uint8_t btLeStatus);
+typedef void (*nRFBondStatusHandler) (void *bondStatusData);
+typedef void (*nRFPipeStatusHandler) (uint64_t pipesOpen,
+    uint64_t pipesClosed);
+typedef void (*nRFTimingHandler) (void *timingData);
+typedef void (*nRFKeyRequestHandler) (uint8_t keyType);
+typedef void (*nRFPipeErrorHandler) (nRFPipe servicePipeNo,
+    uint8_t errorCode, uint8_t *errorData);
+typedef void (*nRFDataReceivedHandler) (nRFPipe servicePipeNo,
+    uint8_t *data);
+typedef void (*nRFDataAckHandler) (nRFPipe servicePipeNo);
 
 class nRF8001
 {
@@ -45,6 +67,23 @@ class nRF8001
         nRFConnectionStatus connectionStatus;
 
         nRFTxStatus transmitReceive(nRFCommand *txCmd, uint16_t timeout);
+
+        nRFCommandResponseHandler commandResponseHandler;
+        nRFTemperatureHandler temperatureHandler;
+        nRFBatteryLevelHandler batteryLevelHandler;
+        nRFDeviceVersionHandler deviceVersionHandler;
+        nRFDeviceAddressHandler deviceAddressHandler;
+        nRFDtmHandler dtmHandler;
+        nRFDynamicDataHandler dynamicDataHandler;
+        nRFConnectedHandler connectedHandler;
+        nRFDisconnectedHandler disconnectedHandler;
+        nRFBondStatusHandler bondStatusHandler;
+        nRFPipeStatusHandler pipeStatusHandler;
+        nRFTimingHandler timingHandler;
+        nRFKeyRequestHandler keyRequestHandler;
+        nRFPipeErrorHandler pipeErrorHandler;
+        nRFDataReceivedHandler dataReceivedHandler;
+        nRFDataAckHandler dataAckHandler;
 
     public:
         void debugEvent(nRFEvent *event);
@@ -105,6 +144,8 @@ class nRF8001
         nRFCmd sendDataAck(nRFPipe servicePipeNo);
         nRFCmd sendDataNack(nRFPipe servicePipeNo,
                                uint8_t errorCode);
+
+        void setTemperatureHandler(nRFTemperatureHandler handler);
 };
 
 #endif /* _NRF8001_H */
