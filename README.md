@@ -6,6 +6,25 @@ code and because non-interrupt-driven SPI is actually faster, I am currently
 in the process of rewriting to remove interrupt handling. This will also make
 the code more flexible because any pin can be used for RDYN and REQN.
 
+## Installation
+
+On a Mac:
+
+    cd ~/Documents/Arduino/libraries
+    git clone https://github.com/guanix/arduino-nrf8001.git nRF8001
+
+The included example works with the Heart Rate function of the Nordic iOS app
+and sends the nRF8001’s internal temperature reading as heart rate and the
+fixed number 78 as battery level. It assumes the following pin assignments,
+easily changed: RESET on pin 5, REQN on pin 6 and RDYN on pin 7. This library
+uses the AVR chip’s hardware SPI support, so the CLK, MISO and MOSI pins cannot
+be changed.
+
+Remember that nRF8001 expects 3.3V supply and logic levels. Connecting it
+to a typical Arduino will fry it. You must either use a level shifter/buffer,
+or a 3.3V Arduino, or a clone such as Seeeduino that can switch between 3.3V
+and 5V modes.
+
 ## License
 Copyright © 2012 Guan Yang
 
