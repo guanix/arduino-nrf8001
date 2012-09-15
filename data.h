@@ -171,7 +171,7 @@ struct nRFEvent {
         uint8_t dataCredits;
 
         struct {
-            uint8_t servicePipeNo;
+            nRFPipe servicePipeNo;
             uint8_t errorCode;
 
             uint8_t rawData[NRF_PIPE_ERROR_LENGTH];
@@ -181,6 +181,8 @@ struct nRFEvent {
             nRFPipe servicePipeNo;
             uint8_t data[NRF_DATA_LENGTH];
         } dataReceived;
+
+        nRFPipe servicePipeNo;
     } msg;
 };
 

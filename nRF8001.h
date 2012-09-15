@@ -39,12 +39,15 @@ class nRF8001
         nRFEventHandler listener;
         uint8_t credits;
         nRFDeviceState deviceState;
+        uint8_t nextSetupMessage;
 
         nRFTxStatus transmitReceive(nRFCommand *txCmd);
-        void sendSetupMessages();
+        void debugEvent(nRFEvent *event);
+        void debugAddress(uint8_t *address);
 
     public:
         nRFDeviceState getDeviceState();
+        void setup();
 
         nRF8001(uint8_t reset_pin,
                    uint8_t reqn_pin,
