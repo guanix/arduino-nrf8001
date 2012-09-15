@@ -97,11 +97,24 @@
 #define NRF_STATUS_ERROR_INVALID_KEY_DATA   0x98
 
 enum nRFDeviceState {
+    Initial,
+    PreSetup,
     Setup,
     Standby,
     Active,
     Test,
-    Sleep
+    Sleep,
+    Invalid
+};
+
+enum nRFCmd {
+    cmdSuccess = 0,
+    cmdNotStandby = 1,
+    cmdNotConnected = 2,
+    cmdSetupError = 3,
+    cmdPipeNotOpen = 4,
+    cmdInsufficientCredits = 5,
+    cmdDataTooLong = 6
 };
 
 enum nRFTxStatus {

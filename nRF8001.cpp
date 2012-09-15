@@ -17,16 +17,48 @@ nRFDeviceState nRF8001::getDeviceState()
     return deviceState;
 }
 
-void nRF8001::setup()
+nRFCmd nRF8001::setup()
 {
-    nrf_debug("sending setup message number 0");
-
-    transmitReceive((nRFCommand *)setup_msgs[nextSetupMessage++].buffer);
-
+    int previousMessageSent = -1;
+    nrf_debug("Waiting for Standby state");
     for (;;) {
         nrf_debug("Calling transmitReceive...");
         transmitReceive(0);
+        if (deviceState == PreSetup) {
+            // Start the setup process
+            nextSetupMessage = 0;
+            break;
+        }
     }
+
+    for (;;) {
+        if (nextSetupMessage >= 0
+            && nextSetupMessage < NB_SETUP_MESSAGES
+            && nextSetupMessage > previousMessageSent) {
+#if NRF_DEBUG
+            Serial.print("sending setup message number ");
+            Serial.println(nextSetupMessage);
+#endif
+            transmitReceive((nRFCommand *)setup_msgs[nextSetupMessage]
+                .buffer);
+            previousMessageSent = nextSetupMessage;
+        } else if (nextSetupMessage >= 0
+            && nextSetupMessage > previousMessageSent) {
+            nrf_debug("we ran out of setup messages!");
+            deviceState = Invalid;
+            return cmdSetupError;
+        } else if (nextSetupMessage == -1) {
+            nrf_debug("setup is complete!");
+        }
+
+        if (deviceState == Standby) {
+            nrf_debug("device in Standby state, returning");
+            return cmdSuccess;
+        }
+
+        transmitReceive(0);
+    }
+
 }
 
 nRF8001::nRF8001(uint8_t reset_pin_arg,
@@ -41,9 +73,10 @@ nRF8001::nRF8001(uint8_t reset_pin_arg,
     rdyn_pin = rdyn_pin_arg;
     listener = eventHandler;
 
-    deviceState = Setup;
+    deviceState = Initial;
     credits = 0;
-    nextSetupMessage = 0;
+    nextSetupMessage = -2;
+    connected = 0;
 
     // Prepare pins and start SPI
     pinMode(reqn_pin, OUTPUT);
@@ -96,7 +129,7 @@ void nRF8001::debugEvent(nRFEvent *event)
     Serial.print(event->debug);
     Serial.print(F(" length="));
     Serial.print(event->length);
-    Serial.println(F(" event="));
+    Serial.print(F(" event="));
 
     switch (event->event) {
         case NRF_DEVICESTARTEDEVENT:
@@ -401,6 +434,7 @@ void nRF8001::debugEvent(nRFEvent *event)
 
             Serial.print(F("Peer address: "));
             debugAddress(event->msg.connected.peerAddress);
+            Serial.println("");
 
             Serial.print(F("Connection interval: "));
             Serial.print(event->msg.connected.connectionInterval/1.25, 2);
@@ -484,7 +518,7 @@ void nRF8001::debugEvent(nRFEvent *event)
             
             Serial.print(F("Open: "));
             for (int i = 0; i < 64; i++) {
-                if (event->msg.pipeStatus.pipesOpen & i) {
+                if (event->msg.pipeStatus.pipesOpen & 1<<i) {
                     Serial.print(" ");
                     Serial.print(i, DEC);
                 }
@@ -493,7 +527,7 @@ void nRF8001::debugEvent(nRFEvent *event)
 
             Serial.print(F("Closed: "));
             for (int i = 0; i < 64; i++) {
-                if (event->msg.pipeStatus.pipesClosed & i) {
+                if (event->msg.pipeStatus.pipesClosed & 1<<i) {
                     Serial.print(" ");
                     Serial.print(i, DEC);
                 }
@@ -595,10 +629,18 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd)
     }
 
     // Bring REQN low
-    digitalWrite(reqn_pin, LOW);
+    if (txLength > 0) {
+        digitalWrite(reqn_pin, LOW);
+    }
+    
+    // TODO: Timeout
 
     // Wait for RDYN low
     while (digitalRead(rdyn_pin) == HIGH);
+
+    if (txLength == 0) {
+        digitalWrite(reqn_pin, LOW);
+    }
 
     nrf_debug("Ready to transmitReceive full duplex!");
 
@@ -638,40 +680,170 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd)
         return Success;
     }
 
-#if NRF_DEBUG
-    debugEvent(rxEvent);
-#endif
-
     // Handle response
     switch (rxEvent->event) {
         case NRF_DEVICESTARTEDEVENT:
             credits = rxEvent->msg.deviceStarted.dataCreditAvailable;
+
+            switch (rxEvent->msg.deviceStarted.operatingMode) {
+                case 0x01:
+                    deviceState = Test;
+                    break;
+                case 0x02:
+                    deviceState = Setup;
+                    break;
+                case 0x03:
+                    if (deviceState == Initial) {
+                        // Before we are setup, Nordic calls it "Standby",
+                        // but that's different from post-setup Standby
+                        deviceState = PreSetup;
+                    } else {
+                        deviceState = Standby;
+                    }
+            }
             break;
         case NRF_COMMANDRESPONSEEVENT: {
             switch (rxEvent->msg.commandResponse.opcode) {
                 // We only do handling of some of these messages
-
+                case NRF_SETUP_OP:
+                    if (rxEvent->msg.commandResponse.status ==
+                        NRF_STATUS_TRANSACTION_CONTINUE) {
+                        nextSetupMessage++;
+                        nrf_debug("ready for next setup message");
+                    } else if (rxEvent->msg.commandResponse.status ==
+                        NRF_STATUS_TRANSACTION_COMPLETE) {
+                        nrf_debug("setup complete");
+                        nextSetupMessage = -1;
+                    }
+                    break;
             }
 
             // Dispatch event
             break;
         }
         case NRF_CONNECTEDEVENT:
+            connected = 1;
             break;
         case NRF_DISCONNECTEDEVENT:
+            connected = 0;
             break;
         case NRF_DATACREDITEVENT:
             credits = rxEvent->msg.dataCredits;
             break;
+        case NRF_PIPESTATUSEVENT:
+            pipesOpen = rxEvent->msg.pipeStatus.pipesOpen;
+            break;
         default: {
-            // Dispatch event
         }
+    }
+
+    // Dispatch event
+    if (listener != 0) {
+        listener(rxEvent);
     }
 
     return Success;
 }
 
-nRFCmd nRF8001::sleep()
+nRFTxStatus nRF8001::poll(uint16_t timeout)
 {
-    transmitReceive(0);
+    return transmitReceive(0);
+}
+
+nRFTxStatus nRF8001::poll()
+{
+    return transmitReceive(0);
+}
+
+nRFCmd nRF8001::getDeviceAddress()
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return cmdNotStandby;
+    }
+
+    nrf_debug("calling getDeviceAddress");
+
+    nRFCommand cmd;
+    cmd.length = 1;
+    cmd.command = NRF_GETDEVICEADDRESS_OP;
+    transmitReceive(&cmd);
+}
+
+nRFCmd nRF8001::getTemperature()
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return cmdNotStandby;
+    }
+
+    nrf_debug("calling getTemperature");
+
+    nRFCommand cmd;
+    cmd.length = 1;
+    cmd.command = NRF_GETTEMPERATURE_OP;
+    transmitReceive(&cmd);
+}
+
+nRFCmd nRF8001::connect(uint16_t timeout, uint16_t advInterval)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return cmdNotStandby;
+    }
+
+    nrf_debug("connecting");
+
+    nRFCommand cmd;
+    cmd.length = 5;
+    cmd.command = NRF_CONNECT_OP;
+    cmd.content.connect.timeout = timeout;
+    cmd.content.connect.advInterval = advInterval;
+    transmitReceive(&cmd);
+}
+
+uint8_t nRF8001::creditsAvailable()
+{
+    return credits;
+}
+
+uint8_t nRF8001::connected() {
+    return connected;
+}
+
+nRFCmd nRF8001::sendData(nRFPipe servicePipeNo,
+    nRFLen dataLength, uint8_t *data)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return cmdNotStandby;
+    }
+
+    if (!connected) {
+        nrf_debug("device not connected");
+        return cmdNotConnected;
+    }
+
+    if (!(pipesOpen & 1<<servicePipeNo)) {
+        nrf_debug("pipe not open");
+        return cmdPipeNotOpen;
+    }
+
+    if (credits <= 0) {
+        nrf_debug("not enough credits");
+        return cmdInsufficientCredits;
+    }
+
+    if (dataLength > NRF_DATA_LENGTH) {
+        nrf_debug("data too long");
+        return cmdDataTooLong;
+    }
+
+    nRFCommand cmd;
+    cmd.command = NRF_SENDDATA_OP;
+    cmd.length = dataLength + 2;
+    cmd.content.data.servicePipeNo = servicePipeNo;
+    memcpy(cmd.content.data.data, data, dataLength);
+    cmd.content.data.data[0] = 5;
+    transmitReceive(&cmd);
 }

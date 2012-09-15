@@ -4,10 +4,9 @@
 #include <Arduino.h>
 
 #ifndef NRF_DEBUG
-#define NRF_DEBUG 0
+#define NRF_DEBUG 1
 #endif
 
-typedef uint8_t nRFCmd;
 typedef uint8_t nRFLen;
 typedef uint8_t nRFPipe;
 
@@ -23,8 +22,10 @@ typedef struct {
 
 #if NRF_DEBUG
 #define nrf_debug(msg) Serial.println(F(msg))
+#define nrf_debugnl(msg) Serial.print(F(msg))
 #else
 #define nrf_debug(msg)
+#define nrf_debugnl(msg)
 #endif
 
 // event handler
@@ -33,26 +34,34 @@ typedef void (*nRFEventHandler) (nRFEvent *);
 class nRF8001
 {
     private:
+        uint64_t pipesOpen;
         uint8_t reset_pin;
         uint8_t reqn_pin;
         uint8_t rdyn_pin;
         nRFEventHandler listener;
         uint8_t credits;
         nRFDeviceState deviceState;
-        uint8_t nextSetupMessage;
+        int8_t nextSetupMessage;
+        uint8_t connected;
 
         nRFTxStatus transmitReceive(nRFCommand *txCmd);
+
+    public:
         void debugEvent(nRFEvent *event);
         void debugAddress(uint8_t *address);
 
-    public:
+        nRFTxStatus poll(uint16_t timeout);
+        nRFTxStatus poll();
         nRFDeviceState getDeviceState();
-        void setup();
+        nRFCmd setup();
 
         nRF8001(uint8_t reset_pin,
                    uint8_t reqn_pin,
                    uint8_t rdyn_pin,
                    nRFEventHandler eventHandler);
+
+        uint8_t creditsAvailable();
+        uint8_t connected();
 
         nRFCmd test(uint8_t feature);
         nRFCmd sleep();
