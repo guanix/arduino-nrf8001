@@ -23,7 +23,7 @@ nRFCmd nRF8001::setup()
     nrf_debug("Waiting for Standby state");
     for (;;) {
         nrf_debug("Calling transmitReceive...");
-        transmitReceive(0);
+        transmitReceive(0, 0);
         if (deviceState == PreSetup) {
             // Start the setup process
             nextSetupMessage = 0;
@@ -40,7 +40,7 @@ nRFCmd nRF8001::setup()
             Serial.println(nextSetupMessage);
 #endif
             transmitReceive((nRFCommand *)setup_msgs[nextSetupMessage]
-                .buffer);
+                .buffer, 0);
             previousMessageSent = nextSetupMessage;
         } else if (nextSetupMessage >= 0
             && nextSetupMessage > previousMessageSent) {
@@ -56,7 +56,7 @@ nRFCmd nRF8001::setup()
             return cmdSuccess;
         }
 
-        transmitReceive(0);
+        transmitReceive(0, 0);
     }
 
 }
@@ -76,7 +76,7 @@ nRF8001::nRF8001(uint8_t reset_pin_arg,
     deviceState = Initial;
     credits = 0;
     nextSetupMessage = -2;
-    connected = 0;
+    connectionStatus = Disconnected;
 
     // Prepare pins and start SPI
     pinMode(reqn_pin, OUTPUT);
@@ -591,7 +591,7 @@ void nRF8001::debugEvent(nRFEvent *event)
 // Transmit a command, and simultaneously receive a message from nRF8001 if
 // there is one. To just receive without transmitting anything, call this
 // function with a NULL argument.
-nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd)
+nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
 {
     // Buffer that we will receive into
     uint8_t rxBuffer[sizeof(nRFEvent)];
@@ -635,8 +635,25 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd)
     
     // TODO: Timeout
 
-    // Wait for RDYN low
-    while (digitalRead(rdyn_pin) == HIGH);
+    if (txLength > 0 || timeout == 0) {
+        // Wait for RDYN low indefinitely
+        while (digitalRead(rdyn_pin) == HIGH);
+    } else {
+        uint8_t rdy = 0;
+        // Wait for RDYN low for 1 ms at a time
+        for (uint8_t waitPeriods = 0; waitPeriods < timeout; waitPeriods++) {
+            if (digitalRead(rdyn_pin) == LOW) {
+                rdy = 1;
+                break;
+            } else {
+                delay(1);
+            }
+        }
+
+        if (!rdy) {
+            return Timeout;
+        }
+    }
 
     if (txLength == 0) {
         digitalWrite(reqn_pin, LOW);
@@ -722,13 +739,13 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd)
             break;
         }
         case NRF_CONNECTEDEVENT:
-            connected = 1;
+            connectionStatus = Connected;
             break;
         case NRF_DISCONNECTEDEVENT:
-            connected = 0;
+            connectionStatus = Disconnected;
             break;
         case NRF_DATACREDITEVENT:
-            credits = rxEvent->msg.dataCredits;
+            credits += rxEvent->msg.dataCredits;
             break;
         case NRF_PIPESTATUSEVENT:
             pipesOpen = rxEvent->msg.pipeStatus.pipesOpen;
@@ -747,12 +764,12 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd)
 
 nRFTxStatus nRF8001::poll(uint16_t timeout)
 {
-    return transmitReceive(0);
+    return transmitReceive(0, timeout);
 }
 
 nRFTxStatus nRF8001::poll()
 {
-    return transmitReceive(0);
+    return transmitReceive(0, 0);
 }
 
 nRFCmd nRF8001::getDeviceAddress()
@@ -767,7 +784,7 @@ nRFCmd nRF8001::getDeviceAddress()
     nRFCommand cmd;
     cmd.length = 1;
     cmd.command = NRF_GETDEVICEADDRESS_OP;
-    transmitReceive(&cmd);
+    transmitReceive(&cmd, 0);
 }
 
 nRFCmd nRF8001::getTemperature()
@@ -782,7 +799,7 @@ nRFCmd nRF8001::getTemperature()
     nRFCommand cmd;
     cmd.length = 1;
     cmd.command = NRF_GETTEMPERATURE_OP;
-    transmitReceive(&cmd);
+    transmitReceive(&cmd, 0);
 }
 
 nRFCmd nRF8001::connect(uint16_t timeout, uint16_t advInterval)
@@ -792,6 +809,8 @@ nRFCmd nRF8001::connect(uint16_t timeout, uint16_t advInterval)
         return cmdNotStandby;
     }
 
+    connectionStatus = Connecting;
+
     nrf_debug("connecting");
 
     nRFCommand cmd;
@@ -799,7 +818,7 @@ nRFCmd nRF8001::connect(uint16_t timeout, uint16_t advInterval)
     cmd.command = NRF_CONNECT_OP;
     cmd.content.connect.timeout = timeout;
     cmd.content.connect.advInterval = advInterval;
-    transmitReceive(&cmd);
+    transmitReceive(&cmd, 0);
 }
 
 uint8_t nRF8001::creditsAvailable()
@@ -807,8 +826,13 @@ uint8_t nRF8001::creditsAvailable()
     return credits;
 }
 
-uint8_t nRF8001::connected() {
-    return connected;
+uint8_t nRF8001::isConnected() {
+    return connectionStatus == Connected;
+}
+
+nRFConnectionStatus nRF8001::getConnectionStatus()
+{
+    return connectionStatus;
 }
 
 nRFCmd nRF8001::sendData(nRFPipe servicePipeNo,
@@ -819,7 +843,7 @@ nRFCmd nRF8001::sendData(nRFPipe servicePipeNo,
         return cmdNotStandby;
     }
 
-    if (!connected) {
+    if (connectionStatus != Connected) {
         nrf_debug("device not connected");
         return cmdNotConnected;
     }
@@ -844,6 +868,5 @@ nRFCmd nRF8001::sendData(nRFPipe servicePipeNo,
     cmd.length = dataLength + 2;
     cmd.content.data.servicePipeNo = servicePipeNo;
     memcpy(cmd.content.data.data, data, dataLength);
-    cmd.content.data.data[0] = 5;
-    transmitReceive(&cmd);
+    transmitReceive(&cmd, 0);
 }

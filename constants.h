@@ -107,6 +107,12 @@ enum nRFDeviceState {
     Invalid
 };
 
+enum nRFConnectionStatus {
+    Disconnected,
+    Connected,
+    Connecting
+};
+
 enum nRFCmd {
     cmdSuccess = 0,
     cmdNotStandby = 1,
@@ -114,13 +120,15 @@ enum nRFCmd {
     cmdSetupError = 3,
     cmdPipeNotOpen = 4,
     cmdInsufficientCredits = 5,
-    cmdDataTooLong = 6
+    cmdDataTooLong = 6,
+    cmdTimeout = 7
 };
 
 enum nRFTxStatus {
     Success             = 0,
     InvalidState        = 1,
-    InsufficientCredits = 2
+    InsufficientCredits = 2,
+    Timeout = 3
 };
 
 // internal state

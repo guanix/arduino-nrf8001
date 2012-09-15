@@ -42,9 +42,9 @@ class nRF8001
         uint8_t credits;
         nRFDeviceState deviceState;
         int8_t nextSetupMessage;
-        uint8_t connected;
+        nRFConnectionStatus connectionStatus;
 
-        nRFTxStatus transmitReceive(nRFCommand *txCmd);
+        nRFTxStatus transmitReceive(nRFCommand *txCmd, uint16_t timeout);
 
     public:
         void debugEvent(nRFEvent *event);
@@ -61,7 +61,8 @@ class nRF8001
                    nRFEventHandler eventHandler);
 
         uint8_t creditsAvailable();
-        uint8_t connected();
+        uint8_t isConnected();
+        nRFConnectionStatus getConnectionStatus();
 
         nRFCmd test(uint8_t feature);
         nRFCmd sleep();
