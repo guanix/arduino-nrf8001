@@ -37,7 +37,8 @@ void setup() {
   
   Serial.begin(115200);
   Serial.println("Hello");
-  nrf = new nRF8001(5, 6, 7, &eventHandler);
+  nrf = new nRF8001(5, 6, 7);
+  nrf->setEventHandler(&eventHandler);
   nrf->setTemperatureHandler(&temperatureHandler);
   if ((nrf->setup()) == cmdSuccess) {
     Serial.println("SUCCESS");

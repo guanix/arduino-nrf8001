@@ -43,8 +43,6 @@ typedef void (*nRFConnectedHandler) (uint8_t addressType, uint8_t *peerAddress,
     void *connectionData);
 typedef void (*nRFDisconnectedHandler) (uint8_t aciStatus, uint8_t btLeStatus);
 typedef void (*nRFBondStatusHandler) (void *bondStatusData);
-typedef void (*nRFPipeStatusHandler) (uint64_t pipesOpen,
-    uint64_t pipesClosed);
 typedef void (*nRFTimingHandler) (void *timingData);
 typedef void (*nRFKeyRequestHandler) (uint8_t keyType);
 typedef void (*nRFPipeErrorHandler) (nRFPipe servicePipeNo,
@@ -78,7 +76,6 @@ class nRF8001
         nRFConnectedHandler connectedHandler;
         nRFDisconnectedHandler disconnectedHandler;
         nRFBondStatusHandler bondStatusHandler;
-        nRFPipeStatusHandler pipeStatusHandler;
         nRFTimingHandler timingHandler;
         nRFKeyRequestHandler keyRequestHandler;
         nRFPipeErrorHandler pipeErrorHandler;
@@ -96,8 +93,7 @@ class nRF8001
 
         nRF8001(uint8_t reset_pin,
                    uint8_t reqn_pin,
-                   uint8_t rdyn_pin,
-                   nRFEventHandler eventHandler);
+                   uint8_t rdyn_pin);
 
         uint8_t creditsAvailable();
         uint8_t isConnected();
@@ -145,7 +141,9 @@ class nRF8001
         nRFCmd sendDataNack(nRFPipe servicePipeNo,
                                uint8_t errorCode);
 
+        void setEventHandler(nRFEventHandler handler);
         void setTemperatureHandler(nRFTemperatureHandler handler);
+        void setCommandResponseHandler(nRFCommandResponseHandler handler);
 };
 
 #endif /* _NRF8001_H */

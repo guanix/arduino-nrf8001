@@ -63,20 +63,36 @@ nRFCmd nRF8001::setup()
 
 nRF8001::nRF8001(uint8_t reset_pin_arg,
                  uint8_t reqn_pin_arg,
-                 uint8_t rdyn_pin_arg,
-                 nRFEventHandler eventHandler)
+                 uint8_t rdyn_pin_arg)
 {
     nrf_debug("Initializing");
     // Initialize data structures
     reset_pin = reset_pin_arg;
     reqn_pin = reqn_pin_arg;
     rdyn_pin = rdyn_pin_arg;
-    listener = eventHandler;
 
     deviceState = Initial;
     credits = 0;
     nextSetupMessage = -2;
     connectionStatus = Disconnected;
+
+    // Zero all the handlers
+    listener = 0;
+    commandResponseHandler = 0;
+    temperatureHandler = 0;
+    batteryLevelHandler = 0;
+    deviceVersionHandler = 0;
+    deviceAddressHandler = 0;
+    dtmHandler = 0;
+    dynamicDataHandler = 0;
+    connectedHandler = 0;
+    disconnectedHandler = 0;
+    bondStatusHandler = 0;
+    timingHandler = 0;
+    keyRequestHandler = 0;
+    pipeErrorHandler = 0;
+    dataReceivedHandler = 0;
+    dataAckHandler = 0;
 
     // Prepare pins and start SPI
     pinMode(reqn_pin, OUTPUT);
@@ -848,9 +864,19 @@ nRFConnectionStatus nRF8001::getConnectionStatus()
     return connectionStatus;
 }
 
+void nRF8001::setEventHandler(nRFEventHandler handler)
+{
+    listener = handler;
+}
+
 void nRF8001::setTemperatureHandler(nRFTemperatureHandler handler)
 {
     temperatureHandler = handler;
+}
+
+void nRF8001::setCommandResponseHandler(nRFCommandResponseHandler handler)
+{
+    commandResponseHandler = handler;
 }
 
 nRFCmd nRF8001::sendData(nRFPipe servicePipeNo,
