@@ -2,3 +2,4 @@ services.h
 .*.swp
 .DS_Store
 *.sublime-*
+.tags
