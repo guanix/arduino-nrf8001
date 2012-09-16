@@ -16,14 +16,26 @@ On a Mac:
 The included example works with the Heart Rate function of the Nordic iOS app
 and sends the nRF8001’s internal temperature reading as heart rate and the
 fixed number 78 as battery level. It assumes the following pin assignments,
-easily changed: RESET on pin 5, REQN on pin 6 and RDYN on pin 7. This library
-uses the AVR chip’s hardware SPI support, so the CLK, MISO and MOSI pins cannot
-be changed.
+easily changed:
+
+* RESET on digital pin 5
+* REQN on digital pin 6
+* RDYN on digital pin 7
+
+This library uses the AVR chip’s hardware SPI support, so the SCK (CLK),
+MISO and MOSI pins cannot be changed:
+
+* MOSI on digital pin 11
+* MISO on digital pin 12
+* SCK on digital pin 13
 
 Remember that nRF8001 expects 3.3V supply and logic levels. Connecting it
 to a typical Arduino will fry it. You must either use a level shifter/buffer,
-or a 3.3V Arduino, or a clone such as Seeeduino that can switch between 3.3V
-and 5V modes.
+or a [3.3V Arduino][promini], or a clone such as [Seeeduino][seeeduino]
+that can switch between 3.3V and 5V modes.
+
+[promini]: https://www.sparkfun.com/products/11114
+[seeeduino]: http://www.seeedstudio.com/depot/seeeduino-v221-atmega-328p-p-669.html
 
 ## License
 Copyright © 2012 Guan Yang
