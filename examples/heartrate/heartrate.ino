@@ -5,6 +5,9 @@
 #include <SPI.h>
 #include <nRF8001.h>
 
+#define HEARTRATE_PIPE 5
+#define BATTERY_PIPE 8
+
 nRF8001 *nrf;
 
 float temperatureC;
@@ -20,13 +23,6 @@ void temperatureHandler(float tempC)
 void eventHandler(nRFEvent *event)
 {
   Serial.println("event handler");
-  
-  if (event->event == NRF_PIPESTATUSEVENT) {
-    if (event->msg.pipeStatus.pipesOpen & 1<<5) {
-      pipeStatusReceived = 1;
-    }
-  }
-  
   nrf->debugEvent(event);
 }
 
@@ -64,22 +60,21 @@ void loop() {
   Serial.println("polling");
   nrf->poll(2000);
   
-  if (pipeStatusReceived && (millis() - lastSent) > 1000 && temperatureC > 0.0) {
+  if (nrf->isPipeOpen(HEARTRATE_PIPE) && (millis() - lastSent) > 1000 && temperatureC > 0.0) {
     Serial.println("ready to send data");
     uint8_t temp[2];
     temp[0] = 0;
     temp[1] = round(temperatureC);
     
-    nrf->sendData(5, 2, (uint8_t *)&temp);
+    nrf->sendData(HEARTRATE_PIPE, 2, (uint8_t *)&temp);
     lastSent = millis();
     uint8_t bat = 78;
-    nrf->sendData(8, 1, &bat);
+    nrf->sendData(BATTERY_PIPE, 1, &bat);
     
     // get new temperature
     nrf->getTemperature();
   } else if (nrf->getConnectionStatus() == Disconnected) {
     Serial.println("Reconnecting");
-    pipeStatusReceived = 0;
     dataSent = 0;
     nrf->connect(0, 32);
   }
