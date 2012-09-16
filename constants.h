@@ -63,7 +63,7 @@
 #define NRF_SENDDATA_OP             0x15
 #define NRF_REQUESTDATA_OP          0x17
 #define NRF_SETLOCALDATA_OP         0x0d
-#define NRF_SETDATAACK_OP           0x16
+#define NRF_SENDDATAACK_OP           0x16
 #define NRF_SENDDATANACK_OP         0x18
 
 #define NRF_STATUS_SUCCESS                  0x00
@@ -131,7 +131,8 @@ enum nRFTxStatus {
     Timeout             = 3,
     NotConnected        = 4,
     PipeNotOpen         = 5,
-    DataTooLong         = 6
+    DataTooLong         = 6,
+    InvalidParameter    = 7
 };
 
 // internal state

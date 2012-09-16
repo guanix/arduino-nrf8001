@@ -43,7 +43,7 @@ struct nRFCommand {
 
         struct {
             uint8_t sequenceNo;
-            uint8_t setupData[NRF_DYNAMIC_DATA_LENGTH];
+            uint8_t dynamicData[NRF_DYNAMIC_DATA_LENGTH];
         } writeDynamicData;
 
         struct {

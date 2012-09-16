@@ -631,7 +631,7 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
        (txCmd->command == NRF_SENDDATA_OP
      || txCmd->command == NRF_REQUESTDATA_OP
      || txCmd->command == NRF_SETLOCALDATA_OP
-     || txCmd->command == NRF_SETDATAACK_OP
+     || txCmd->command == NRF_SENDDATAACK_OP
      || txCmd->command == NRF_SENDDATANACK_OP)) {
         if (credits < 1) {
             nrf_debug("transmitReceive fail, not enough credits");
@@ -888,6 +888,24 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
     return Success;
 }
 
+// Informational functions
+
+uint8_t nRF8001::creditsAvailable()
+{
+    return credits;
+}
+
+uint8_t nRF8001::isConnected() {
+    return connectionStatus == Connected;
+}
+
+nRFConnectionStatus nRF8001::getConnectionStatus()
+{
+    return connectionStatus;
+}
+
+// Receive functions
+
 nRFTxStatus nRF8001::poll(uint16_t timeout)
 {
     return transmitReceive(0, timeout);
@@ -898,34 +916,118 @@ nRFTxStatus nRF8001::poll()
     return transmitReceive(0, 0);
 }
 
-nRFTxStatus nRF8001::getDeviceAddress()
+uint8_t nRF8001::isPipeOpen(nRFPipe servicePipeNo)
+{
+    return pipesOpen & 1<<servicePipeNo;
+}
+
+// Transmit functions
+
+nRFTxStatus nRF8001::transmitCommand(uint8_t command)
 {
     if (deviceState != Standby) {
         nrf_debug("device not in Standby state");
         return InvalidState;
     }
 
-    nrf_debug("calling getDeviceAddress");
+    nrf_debug("calling transmitCommand");
 
     nRFCommand cmd;
     cmd.length = 1;
-    cmd.command = NRF_GETDEVICEADDRESS_OP;
+    cmd.command = command;
     return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::transmitPipeCommand(uint8_t command, nRFPipe pipe)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nrf_debug("calling transmitPipeCommand");
+
+    nRFCommand cmd;
+    cmd.length = 2;
+    cmd.command = command;
+    cmd.content.servicePipeNo = pipe;
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::test(uint8_t feature)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nrf_debug("calling test");
+
+    nRFCommand cmd;
+    cmd.length = 2;
+    cmd.command = NRF_TEST_OP;
+    cmd.content.testFeature = feature;
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::sleep()
+{
+    return transmitCommand(NRF_SLEEP_OP);
+}
+
+nRFTxStatus nRF8001::echo(nRFLen dataLength, uint8_t *data)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    if (dataLength > NRF_MAX_ECHO_MESSAGE_LENGTH) {
+        nrf_debug("data too long");
+        return DataTooLong;
+    }
+
+    nrf_debug("calling echo");
+
+    nRFCommand cmd;
+    cmd.length = dataLength + 1;
+    cmd.command = NRF_ECHO_OP;
+    memcpy(cmd.content.echoData, data, dataLength);
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::wakeup()
+{
+    return transmitCommand(NRF_WAKEUP_OP);
+}
+
+nRFTxStatus nRF8001::getBatteryLevel()
+{
+    return transmitCommand(NRF_GETBATTERYLEVEL_OP);
 }
 
 nRFTxStatus nRF8001::getTemperature()
 {
+    return transmitCommand(NRF_GETTEMPERATURE_OP);
+}
+
+nRFTxStatus nRF8001::setTxPower(uint8_t powerLevel)
+{
     if (deviceState != Standby) {
         nrf_debug("device not in Standby state");
         return InvalidState;
     }
 
-    nrf_debug("calling getTemperature");
-
     nRFCommand cmd;
-    cmd.length = 1;
-    cmd.command = NRF_GETTEMPERATURE_OP;
+    cmd.length = 2;
+    cmd.command = NRF_SETTXPOWER_OP;
+    cmd.content.radioTxPowerLevel = powerLevel;
     return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::getDeviceAddress()
+{
+    return transmitCommand(NRF_GETDEVICEADDRESS_OP);
 }
 
 nRFTxStatus nRF8001::connect(uint16_t timeout, uint16_t advInterval)
@@ -947,18 +1049,188 @@ nRFTxStatus nRF8001::connect(uint16_t timeout, uint16_t advInterval)
     return transmitReceive(&cmd, 0);
 }
 
-uint8_t nRF8001::creditsAvailable()
+nRFTxStatus nRF8001::radioReset()
 {
-    return credits;
+    nrf_debug("sending radio reset");
+    nRFCommand cmd;
+    cmd.length = 1;
+    cmd.command = NRF_RADIORESET_OP;
+    return transmitReceive(&cmd, 0);
 }
 
-uint8_t nRF8001::isConnected() {
-    return connectionStatus == Connected;
+nRFTxStatus nRF8001::bond(uint16_t timeout, uint16_t advInterval)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nRFCommand cmd;
+    cmd.length = 5;
+    cmd.command = NRF_BOND_OP;
+    cmd.content.bond.timeout = timeout;
+    cmd.content.bond.advInterval = advInterval;
+    return transmitReceive(&cmd, 0);
 }
 
-nRFConnectionStatus nRF8001::getConnectionStatus()
+nRFTxStatus nRF8001::disconnect(uint8_t reason)
 {
-    return connectionStatus;
+    if (deviceState != Standby || connectionStatus != Connected) {
+        nrf_debug("device not in standby and connected state");
+        return InvalidState;
+    }
+
+    nRFCommand cmd;
+    cmd.length = 2;
+    cmd.command = NRF_DISCONNECT_OP;
+    cmd.content.disconnectReason = reason;
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::changeTimingRequest(uint16_t intervalMin,
+                                   uint16_t intervalMax,
+                                   uint16_t slaveLatency,
+                                   uint16_t timeout)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nRFCommand cmd;
+    cmd.command = NRF_CHANGETIMINGREQUEST_OP;
+
+    if (intervalMin > 0 || intervalMax > 0
+        || slaveLatency > 0 || timeout >> 0) {
+        cmd.length = 9;
+        cmd.content.changeTimingRequest.intervalMin = intervalMin;
+        cmd.content.changeTimingRequest.intervalMax = intervalMax;
+        cmd.content.changeTimingRequest.slaveLatency = slaveLatency;
+        cmd.content.changeTimingRequest.timeout = timeout;
+    } else {
+        cmd.length = 1;
+    }
+
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::openRemotePipe(nRFPipe servicePipeNo)
+{
+    return transmitPipeCommand(NRF_OPENREMOTEPIPE_OP, servicePipeNo);
+}
+
+nRFTxStatus nRF8001::closeRemotePipe(nRFPipe servicePipeNo)
+{
+    return transmitPipeCommand(NRF_CLOSEREMOTEPIPE_OP, servicePipeNo);
+}
+
+nRFTxStatus nRF8001::dtmCommand(uint16_t dtmCmd)
+{
+    nRFCommand cmd;
+    cmd.length = 3;
+    cmd.command = NRF_DTMCOMMAND_OP;
+    cmd.content.dtmCommand = dtmCmd;
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::readDynamicData()
+{
+    return transmitCommand(NRF_READDYNAMICDATA_OP);
+}
+
+nRFTxStatus nRF8001::writeDynamicData(uint8_t seqNo, nRFLen dataLength,
+    uint8_t *data)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nRFCommand cmd;
+    cmd.length = dataLength + 2;
+    cmd.command = NRF_WRITEDYNAMICDATA_OP;
+    cmd.content.writeDynamicData.sequenceNo = seqNo;
+    memcpy(cmd.content.writeDynamicData.dynamicData, data, dataLength);
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::setApplLatency(uint8_t applLatencyMode, uint16_t latency)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nRFCommand cmd;
+    cmd.length = 4;
+    cmd.command = NRF_SETAPPLICATIONLATENCY_OP;
+    cmd.content.setApplLatency.applLatencyMode = applLatencyMode;
+    cmd.content.setApplLatency.latency = latency;
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::setKey(uint8_t keyType, uint8_t *key)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nRFCommand cmd;
+    cmd.command = NRF_SETKEY_OP;
+    cmd.content.setKey.keyType = keyType;
+
+    if (keyType == 0) {
+        cmd.length = 2;
+    } else if (keyType == 1) {
+        cmd.length = 2 + NRF_PASSKEY_LENGTH;
+        memcpy(cmd.content.setKey.key, key, NRF_PASSKEY_LENGTH);
+    } else {
+        return InvalidParameter;
+    }
+
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::openAdvPipe(uint64_t advServiceDataPipes)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nRFCommand cmd;
+    cmd.length = 9;
+    cmd.command = NRF_OPENADVPIPE_OP;
+    cmd.content.advServiceDataPipes = advServiceDataPipes;
+
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::broadcast(uint16_t timeout, uint16_t advInterval)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nRFCommand cmd;
+    cmd.length = 5;
+    cmd.command = NRF_BROADCAST_OP;
+    cmd.content.broadcast.timeout = timeout;
+    cmd.content.broadcast.advInterval = advInterval;
+
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::bondSecurityRequest()
+{
+    return transmitCommand(NRF_BONDSECREQUEST_OP);
+}
+
+nRFTxStatus nRF8001::directedConnect()
+{
+    return transmitCommand(NRF_DIRECTEDCONNECT_OP);
 }
 
 nRFTxStatus nRF8001::sendData(nRFPipe servicePipeNo,
@@ -997,9 +1269,48 @@ nRFTxStatus nRF8001::sendData(nRFPipe servicePipeNo,
     return transmitReceive(&cmd, 0);
 }
 
-uint8_t nRF8001::isPipeOpen(nRFPipe servicePipeNo)
+nRFTxStatus nRF8001::requestData(nRFPipe servicePipeNo)
 {
-    return pipesOpen & 1<<servicePipeNo;
+    return transmitPipeCommand(NRF_REQUESTDATA_OP, servicePipeNo);
+}
+
+nRFTxStatus nRF8001::setLocalData(nRFPipe servicePipeNo, nRFLen dataLength,
+    uint8_t *data)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nRFCommand cmd;
+    cmd.length = 2 + dataLength;
+    cmd.command = NRF_SETLOCALDATA_OP;
+    cmd.content.data.servicePipeNo = servicePipeNo;
+
+    memcpy(cmd.content.data.data, data, dataLength);
+
+    return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::sendDataAck(nRFPipe servicePipeNo)
+{
+    return transmitPipeCommand(NRF_SENDDATAACK_OP, servicePipeNo);
+}
+
+nRFTxStatus nRF8001::sendDataNack(nRFPipe servicePipeNo, uint8_t errorCode)
+{
+    if (deviceState != Standby) {
+        nrf_debug("device not in Standby state");
+        return InvalidState;
+    }
+
+    nRFCommand cmd;
+    cmd.length = 3;
+    cmd.command = NRF_SENDDATANACK_OP;
+    cmd.content.sendDataNack.servicePipeNo = servicePipeNo;
+    cmd.content.sendDataNack.errorCode = errorCode;
+
+    return transmitReceive(&cmd, 0);
 }
 
 // Event handler registration

@@ -63,6 +63,8 @@ class nRF8001
         nRFConnectionStatus connectionStatus;
 
         nRFTxStatus transmitReceive(nRFCommand *txCmd, uint16_t timeout);
+        nRFTxStatus transmitCommand(uint8_t command);
+        nRFTxStatus transmitPipeCommand(uint8_t command, nRFPipe pipe);
 
         nRFCommandResponseHandler commandResponseHandler;
         nRFTemperatureHandler temperatureHandler;
@@ -117,6 +119,7 @@ class nRF8001
         nRFTxStatus openRemotePipe(nRFPipe servicePipeNo);
         nRFTxStatus closeRemotePipe(nRFPipe servicePipeNo);
         nRFTxStatus dtmCommand(uint16_t dtmCmd);
+        nRFTxStatus readDynamicData();
         nRFTxStatus writeDynamicData(uint8_t seqNo,
                                    nRFLen dataLength,
                                    uint8_t *data);
@@ -133,7 +136,7 @@ class nRF8001
         nRFTxStatus requestData(nRFPipe servicePipeNo);
         nRFTxStatus setLocalData(nRFPipe servicePipeNo,
                                nRFLen dataLength,
-                               uint8_t data);
+                               uint8_t *data);
         nRFTxStatus sendDataAck(nRFPipe servicePipeNo);
         nRFTxStatus sendDataNack(nRFPipe servicePipeNo,
                                uint8_t errorCode);
