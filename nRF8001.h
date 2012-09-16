@@ -138,8 +138,19 @@ class nRF8001
                                uint8_t errorCode);
 
         void setEventHandler(nRFEventHandler handler);
-        void setTemperatureHandler(nRFTemperatureHandler handler);
         void setCommandResponseHandler(nRFCommandResponseHandler handler);
+        void setTemperatureHandler(nRFTemperatureHandler handler);
+        void setBatteryLevelHandler(nRFBatteryLevelHandler handler);
+        void setDeviceVersionHandler(nRFDeviceVersionHandler handler);
+        void setDeviceAddressHandler(nRFDeviceAddressHandler handler);
+        void setDynamicDataHandler(nRFDynamicDataHandler handler);
+        void setConnectedHandler(nRFConnectedHandler handler);
+        void setDisconnectedHandler(nRFDisconnectedHandler handler);
+        void setBondStatusHandler(nRFBondStatusHandler handler);
+        void setKeyRequestHandler(nRFKeyRequestHandler handler);
+        void setPipeErrorHandler(nRFPipeErrorHandler handler);
+        void setDataReceivedHandler(nRFDataReceivedHandler handler);
+        void setDataAckHandler(nRFDataAckHandler handler);
 };
 
 #endif /* _NRF8001_H */
