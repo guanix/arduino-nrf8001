@@ -37,13 +37,11 @@ typedef void (*nRFDeviceVersionHandler) (uint16_t configId,
     uint8_t aciVersion, uint8_t setupFormat, uint8_t configStatus);
 typedef void (*nRFDeviceAddressHandler) (uint8_t *address,
     uint8_t addressType);
-typedef void (*nRFDtmHandler) (uint8_t dtmEvent);
 typedef void (*nRFDynamicDataHandler) (uint8_t seqNo, uint8_t *data);
 typedef void (*nRFConnectedHandler) (uint8_t addressType, uint8_t *peerAddress,
     void *connectionData);
 typedef void (*nRFDisconnectedHandler) (uint8_t aciStatus, uint8_t btLeStatus);
 typedef void (*nRFBondStatusHandler) (void *bondStatusData);
-typedef void (*nRFTimingHandler) (void *timingData);
 typedef void (*nRFKeyRequestHandler) (uint8_t keyType);
 typedef void (*nRFPipeErrorHandler) (nRFPipe servicePipeNo,
     uint8_t errorCode, uint8_t *errorData);
@@ -71,12 +69,10 @@ class nRF8001
         nRFBatteryLevelHandler batteryLevelHandler;
         nRFDeviceVersionHandler deviceVersionHandler;
         nRFDeviceAddressHandler deviceAddressHandler;
-        nRFDtmHandler dtmHandler;
         nRFDynamicDataHandler dynamicDataHandler;
         nRFConnectedHandler connectedHandler;
         nRFDisconnectedHandler disconnectedHandler;
         nRFBondStatusHandler bondStatusHandler;
-        nRFTimingHandler timingHandler;
         nRFKeyRequestHandler keyRequestHandler;
         nRFPipeErrorHandler pipeErrorHandler;
         nRFDataReceivedHandler dataReceivedHandler;
