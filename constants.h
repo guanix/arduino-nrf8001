@@ -128,7 +128,10 @@ enum nRFTxStatus {
     Success             = 0,
     InvalidState        = 1,
     InsufficientCredits = 2,
-    Timeout = 3
+    Timeout             = 3,
+    NotConnected        = 4,
+    PipeNotOpen         = 5,
+    DataTooLong         = 6
 };
 
 // internal state

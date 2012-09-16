@@ -95,46 +95,47 @@ class nRF8001
         uint8_t isConnected();
         nRFConnectionStatus getConnectionStatus();
 
-        nRFCmd test(uint8_t feature);
-        nRFCmd sleep();
-        nRFCmd getDeviceVersion();
-        nRFCmd echo(nRFLen dataLength, uint8_t *data);
-        nRFCmd wakeup();
-        nRFCmd getBatteryLevel();
-        nRFCmd getTemperature();
-        nRFCmd setup(nRFLen dataLength, uint8_t *setupData);
-        nRFCmd setTxPower(uint8_t powerLevel);
-        nRFCmd getDeviceAddress();
-        nRFCmd connect(uint16_t timeout, uint16_t advInterval);
-        nRFCmd radioReset();
-        nRFCmd bond(uint16_t timeout, uint16_t advInterval);
-        nRFCmd disconnect(uint8_t reason);
-        nRFCmd changeTimingRequest(uint16_t intervalMin,
+        uint8_t isPipeOpen(nRFPipe servicePipeNo);
+
+        nRFTxStatus test(uint8_t feature);
+        nRFTxStatus sleep();
+        nRFTxStatus getDeviceVersion();
+        nRFTxStatus echo(nRFLen dataLength, uint8_t *data);
+        nRFTxStatus wakeup();
+        nRFTxStatus getBatteryLevel();
+        nRFTxStatus getTemperature();
+        nRFTxStatus setTxPower(uint8_t powerLevel);
+        nRFTxStatus getDeviceAddress();
+        nRFTxStatus connect(uint16_t timeout, uint16_t advInterval);
+        nRFTxStatus radioReset();
+        nRFTxStatus bond(uint16_t timeout, uint16_t advInterval);
+        nRFTxStatus disconnect(uint8_t reason);
+        nRFTxStatus changeTimingRequest(uint16_t intervalMin,
                                    uint16_t intervalMax,
                                    uint16_t slaveLatency,
                                    uint16_t timeout);
-        nRFCmd openRemotePipe(nRFPipe servicePipeNo);
-        nRFCmd closeRemotePipe(nRFPipe servicePipeNo);
-        nRFCmd dtmCommand(uint16_t dtmCmd);
-        nRFCmd writeDynamicData(uint8_t seqNo,
+        nRFTxStatus openRemotePipe(nRFPipe servicePipeNo);
+        nRFTxStatus closeRemotePipe(nRFPipe servicePipeNo);
+        nRFTxStatus dtmCommand(uint16_t dtmCmd);
+        nRFTxStatus writeDynamicData(uint8_t seqNo,
                                    nRFLen dataLength,
                                    uint8_t *data);
-        nRFCmd setApplLatency(uint8_t applLatencyMode,
+        nRFTxStatus setApplLatency(uint8_t applLatencyMode,
                                  uint16_t latency);
-        nRFCmd setKey(uint8_t keyType, uint8_t *key);
-        nRFCmd openAdvPipe(uint64_t advServiceDataPipes);
-        nRFCmd broadcast(uint16_t timeout, uint16_t advInterval);
-        nRFCmd bondSecurityRequest();
-        nRFCmd directedConnect();
-        nRFCmd sendData(nRFPipe servicePipeNo,
+        nRFTxStatus setKey(uint8_t keyType, uint8_t *key);
+        nRFTxStatus openAdvPipe(uint64_t advServiceDataPipes);
+        nRFTxStatus broadcast(uint16_t timeout, uint16_t advInterval);
+        nRFTxStatus bondSecurityRequest();
+        nRFTxStatus directedConnect();
+        nRFTxStatus sendData(nRFPipe servicePipeNo,
                            nRFLen dataLength,
                            uint8_t *data);
-        nRFCmd requestData(nRFPipe servicePipeNo);
-        nRFCmd setLocalData(nRFPipe servicePipeNo,
+        nRFTxStatus requestData(nRFPipe servicePipeNo);
+        nRFTxStatus setLocalData(nRFPipe servicePipeNo,
                                nRFLen dataLength,
                                uint8_t data);
-        nRFCmd sendDataAck(nRFPipe servicePipeNo);
-        nRFCmd sendDataNack(nRFPipe servicePipeNo,
+        nRFTxStatus sendDataAck(nRFPipe servicePipeNo);
+        nRFTxStatus sendDataNack(nRFPipe servicePipeNo,
                                uint8_t errorCode);
 
         void setEventHandler(nRFEventHandler handler);

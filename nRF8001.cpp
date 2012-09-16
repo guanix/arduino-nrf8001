@@ -830,6 +830,7 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
             break;
         case NRF_DISCONNECTEDEVENT:
             connectionStatus = Disconnected;
+            pipesOpen = 0;
             if (disconnectedHandler != 0) {
                 disconnectedHandler(
                     rxEvent->msg.disconnected.aciStatus,
@@ -897,11 +898,11 @@ nRFTxStatus nRF8001::poll()
     return transmitReceive(0, 0);
 }
 
-nRFCmd nRF8001::getDeviceAddress()
+nRFTxStatus nRF8001::getDeviceAddress()
 {
     if (deviceState != Standby) {
         nrf_debug("device not in Standby state");
-        return cmdNotStandby;
+        return InvalidState;
     }
 
     nrf_debug("calling getDeviceAddress");
@@ -909,14 +910,14 @@ nRFCmd nRF8001::getDeviceAddress()
     nRFCommand cmd;
     cmd.length = 1;
     cmd.command = NRF_GETDEVICEADDRESS_OP;
-    transmitReceive(&cmd, 0);
+    return transmitReceive(&cmd, 0);
 }
 
-nRFCmd nRF8001::getTemperature()
+nRFTxStatus nRF8001::getTemperature()
 {
     if (deviceState != Standby) {
         nrf_debug("device not in Standby state");
-        return cmdNotStandby;
+        return InvalidState;
     }
 
     nrf_debug("calling getTemperature");
@@ -924,14 +925,14 @@ nRFCmd nRF8001::getTemperature()
     nRFCommand cmd;
     cmd.length = 1;
     cmd.command = NRF_GETTEMPERATURE_OP;
-    transmitReceive(&cmd, 0);
+    return transmitReceive(&cmd, 0);
 }
 
-nRFCmd nRF8001::connect(uint16_t timeout, uint16_t advInterval)
+nRFTxStatus nRF8001::connect(uint16_t timeout, uint16_t advInterval)
 {
     if (deviceState != Standby) {
         nrf_debug("device not in Standby state");
-        return cmdNotStandby;
+        return InvalidState;
     }
 
     connectionStatus = Connecting;
@@ -943,7 +944,7 @@ nRFCmd nRF8001::connect(uint16_t timeout, uint16_t advInterval)
     cmd.command = NRF_CONNECT_OP;
     cmd.content.connect.timeout = timeout;
     cmd.content.connect.advInterval = advInterval;
-    transmitReceive(&cmd, 0);
+    return transmitReceive(&cmd, 0);
 }
 
 uint8_t nRF8001::creditsAvailable()
@@ -960,32 +961,32 @@ nRFConnectionStatus nRF8001::getConnectionStatus()
     return connectionStatus;
 }
 
-nRFCmd nRF8001::sendData(nRFPipe servicePipeNo,
+nRFTxStatus nRF8001::sendData(nRFPipe servicePipeNo,
     nRFLen dataLength, uint8_t *data)
 {
     if (deviceState != Standby) {
         nrf_debug("device not in Standby state");
-        return cmdNotStandby;
+        return InvalidState;
     }
 
     if (connectionStatus != Connected) {
         nrf_debug("device not connected");
-        return cmdNotConnected;
+        return NotConnected;
     }
 
     if (!(pipesOpen & 1<<servicePipeNo)) {
         nrf_debug("pipe not open");
-        return cmdPipeNotOpen;
+        return PipeNotOpen;
     }
 
     if (credits <= 0) {
         nrf_debug("not enough credits");
-        return cmdInsufficientCredits;
+        return InsufficientCredits;
     }
 
     if (dataLength > NRF_DATA_LENGTH) {
         nrf_debug("data too long");
-        return cmdDataTooLong;
+        return DataTooLong;
     }
 
     nRFCommand cmd;
@@ -993,12 +994,15 @@ nRFCmd nRF8001::sendData(nRFPipe servicePipeNo,
     cmd.length = dataLength + 2;
     cmd.content.data.servicePipeNo = servicePipeNo;
     memcpy(cmd.content.data.data, data, dataLength);
-    transmitReceive(&cmd, 0);
-    return cmdSuccess;
+    return transmitReceive(&cmd, 0);
+}
+
+uint8_t nRF8001::isPipeOpen(nRFPipe servicePipeNo)
+{
+    return pipesOpen & 1<<servicePipeNo;
 }
 
 // Event handler registration
-
 
 void nRF8001::setEventHandler(nRFEventHandler handler)
 {
