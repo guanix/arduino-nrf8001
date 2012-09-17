@@ -42,20 +42,28 @@ It requires an external antenna and matching components, but little else.
 At least one vendor markets a complete module incorporating the antenna,
 which only requires a decoupling cap and a ground plane.
 
-Communication with the nRF8001 uses a custom binary SPI protocol, but in
-addition to the typical SS pin to send a command (called REQN here), there
-is an additional pin, RDYN, which has two purposes. If the master (your
-Arduino or other microcontroller) initiates a command, nRF8001 uses RDYN
-to indicate that it is ready to receive a command. nRF8001 can also
-initiate a transmission, for example when it has received data from a
-connected device, in which case it brings RDYN low to indicate that it
-wants to transmit, and the master brings REQN low to indicate that the
-transmission can proceed.
+Communication with the nRF8001 uses a custom binary SPI protocol that is
+documented in the datasheet.
+Communication is full duplex and happens in _transactions_ where the master
+can send a request while the slave simultaneously sends a response or
+event.
 
-All commands, responses to commands and other events are sent asynchronously.
-You will receive a response, but it may come several transactions later. The
-nRF8001 can also send events or responses to previous commands _while_ you
-are transmitting a command. For this reason, while the Arduino nRF8001 library
+In addition to the typical SS pin to send a command (called REQN here), there
+is an additional pin, RDYN. When the master wants to initiate a transaction:
+
+1. Master brings REQN low.
+2. Slave (nRF8001) brings RDYN low.
+3. SPI transaction proceeds. Master sends a command and simultaneously
+    receives a message (an event or a response to a previous command.)
+
+When the slave initiates a transaction:
+
+1. Slave brings RDYN low.
+2. Master brings REQN low.
+3. SPI transaction proceeds.
+
+Because nRF8001 SPI transactions are asynchronous,
+while the Arduino nRF8001 library
 contains a number of functions to send commands to the nRF8001, those
 functions almost never immediately return a response. Instead, you must
 register _handlers_, special functions that you define, which will in turn
@@ -91,7 +99,7 @@ serial port.
 After initializing the `nRF8001` class, registering handlers and calling
 `nRF8001::setup` to send setup messages from `services.h` to the nRF8001
 chip, it then calls `nRF8001::getDeviceAddress()` to get the device
-address and `nRF8001::getTemperature()` to read the temperature.
+address and `nRF8001::getTemperature()` to request the temperature.
 It then calls `nRF8001::connect` to wait for a connection from a peer
 device.
 

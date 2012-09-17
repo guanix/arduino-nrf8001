@@ -14,12 +14,14 @@ float temperatureC;
 uint8_t pipeStatusReceived, dataSent;
 unsigned long lastSent;
 
+// This function is called when nRF8001 responds with the temperature
 void temperatureHandler(float tempC)
 {
   Serial.println("received temperature");
   temperatureC = tempC;
 }
 
+// Generic event handler, here it's just for debugging all received events
 void eventHandler(nRFEvent *event)
 {
   Serial.println("event handler");
@@ -33,7 +35,11 @@ void setup() {
   
   Serial.begin(115200);
   Serial.println("Hello");
+  
+  // nRF8001 class initialized with pin numbers
   nrf = new nRF8001(5, 6, 7);
+  
+  // Register event handles
   nrf->setEventHandler(&eventHandler);
   nrf->setTemperatureHandler(&temperatureHandler);
   if ((nrf->setup()) == cmdSuccess) {
@@ -43,6 +49,10 @@ void setup() {
     while (1);
   }
   
+  // These functions merely request device address and temperature,
+  // actual responses are asynchronous. They'll return error codes
+  // if somehow the request itself failed, for example because
+  // the device is not ready for these commands.
   nrf->getDeviceAddress();
   nrf->poll();
   nrf->getTemperature();
@@ -58,9 +68,12 @@ void setup() {
 
 void loop() {
   Serial.println("polling");
+  
+  // Polling will block - times out after 2 seconds
   nrf->poll(2000);
   
-  if (nrf->isPipeOpen(HEARTRATE_PIPE) && (millis() - lastSent) > 1000 && temperatureC > 0.0) {
+  // If heart rate pipe is open
+  if (nrf->isPipeOpen(HEARTRATE_PIPE) && (millis() - lastSent) > 1000 && temperatureC > 0.0 && nrf->creditsAvailable()) {
     Serial.println("ready to send data");
     uint8_t temp[2];
     temp[0] = 0;
@@ -69,7 +82,11 @@ void loop() {
     nrf->sendData(HEARTRATE_PIPE, 2, (uint8_t *)&temp);
     lastSent = millis();
     uint8_t bat = 78;
-    nrf->sendData(BATTERY_PIPE, 1, &bat);
+    
+    // If battery pipe is open
+    if (nrf->isPipeOpen(BATTERY_PIPE) && nrf->creditsAvailable()) {
+      nrf->sendData(BATTERY_PIPE, 1, &bat);
+    }
     
     // get new temperature
     nrf->getTemperature();
