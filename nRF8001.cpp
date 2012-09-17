@@ -741,11 +741,26 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
             break;
         case NRF_COMMANDRESPONSEEVENT: {
             if (rxEvent->msg.commandResponse.status != 0x00) {
-                nrf_debug("non-success command response event");
+#if NRF_DEBUG
+                Serial.print("non-success command response event: 0x");
+                Serial.println(rxEvent->msg.commandResponse.status);
+#endif
                 if (commandResponseHandler != 0) {
                     commandResponseHandler(
                         rxEvent->msg.commandResponse.opcode,
                         rxEvent->msg.commandResponse.status);
+                }
+
+                if (rxEvent->msg.commandResponse.opcode == NRF_SETUP_OP &&
+                    rxEvent->msg.commandResponse.status ==
+                    NRF_STATUS_TRANSACTION_CONTINUE) {
+                    nextSetupMessage++;
+                    nrf_debug("ready for next setup message");
+                } else if (rxEvent->msg.commandResponse.opcode == NRF_SETUP_OP &&
+                    rxEvent->msg.commandResponse.status ==
+                    NRF_STATUS_TRANSACTION_COMPLETE) {
+                    nrf_debug("setup complete");
+                    nextSetupMessage = -1;
                 }
                 break;
             }
@@ -753,15 +768,6 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
             switch (rxEvent->msg.commandResponse.opcode) {
                 // We only do handling of some of these messages
                 case NRF_SETUP_OP:
-                    if (rxEvent->msg.commandResponse.status ==
-                        NRF_STATUS_TRANSACTION_CONTINUE) {
-                        nextSetupMessage++;
-                        nrf_debug("ready for next setup message");
-                    } else if (rxEvent->msg.commandResponse.status ==
-                        NRF_STATUS_TRANSACTION_COMPLETE) {
-                        nrf_debug("setup complete");
-                        nextSetupMessage = -1;
-                    }
                     break;
                 case NRF_GETTEMPERATURE_OP:
                     if (temperatureHandler != 0) {
@@ -800,7 +806,7 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
                 case NRF_READDYNAMICDATA_OP:
                     if (dynamicDataHandler != 0) {
                         dynamicDataHandler(
-                            rxEvent->msg.commandResponse
+                           rxEvent->msg.commandResponse
                                 .data.readDynamicData.sequenceNo,
                             rxEvent->msg.commandResponse
                                 .data.readDynamicData.dynamicData);
