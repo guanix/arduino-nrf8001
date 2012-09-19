@@ -94,7 +94,10 @@ The included heart rate example defines two event handlers,
 built-in thermometer and stores it in a global variable,
 and the catch-all `eventHandler`, which only calls `nRF8001::debugEvent`,
 a function that prints extensive information about received events to the
-serial port.
+serial port. It works with Nordic’s [test app][nordicapp] on iPhone 4S,
+iPhone 5 and the third generation iPad.
+
+[nordicapp]: http://itunes.apple.com/us/app/nrfready-utility/id497679111?mt=8
 
 After initializing the `nRF8001` class, registering handlers and calling
 `nRF8001::setup` to send setup messages from `services.h` to the nRF8001
