@@ -127,17 +127,21 @@ nRF8001::nRF8001(uint8_t reset_pin_arg,
 #endif
 }
 
+void nRF8001::addressToString(char *str, uint8_t *address)
+{
+    for (int i = NRF_ADDRESS_LENGTH - 1; i >= 0; i--) {
+        uint8_t c = address[i];
+        sprintf(str + (NRF_ADDRESS_LENGTH-1-i)*2, "%02x", c);
+    }
+}
+
 void nRF8001::debugAddress(uint8_t *address)
 {
     Serial.print("0x");
     // Addresses are NRF_ADDRESS_LENGTH long, MSB to LSB
-    for (int i = NRF_ADDRESS_LENGTH - 1; i >= 0; i--) {
-        uint8_t c = address[i];
-        if (c < 0x10) {
-            Serial.print("0");
-        }
-        Serial.print(c, HEX);
-    }
+    char buf[NRF_ADDRESS_LENGTH*2+1];
+    addressToString(buf, address);
+    Serial.print(buf);
 }
 
 void nRF8001::debugEvent(nRFEvent *event)

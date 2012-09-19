@@ -83,6 +83,7 @@ class nRF8001
     public:
         void debugEvent(nRFEvent *event);
         void debugAddress(uint8_t *address);
+        void addressToString(char *str, uint8_t *address);
 
         nRFTxStatus poll(uint16_t timeout);
         nRFTxStatus poll();
