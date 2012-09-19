@@ -112,3 +112,12 @@ internal units.)
 Requests the nRF8001 device address. `address` is a 6 byte long array
 containing the 48-bit MAC address, unterminated, LSB first.
 See the nRF8001 datasheet for values of `addressType`.
+
+    nRFTxStatus getDeviceVersion();
+    void setDeviceVersionHandler(nRFDeviceVersionHandler handler);
+    typedef void (*nRFDeviceVersionHandler) (uint16_t configId,
+        uint8_t aciVersion, uint8_t setupFormat, uint8_t configStatus);
+
+See the nRF8001 datasheet for the meaning of these values.
+
+## Connections and data
