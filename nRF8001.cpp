@@ -648,6 +648,12 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
     // Bring REQN low
     if (txLength > 0) {
         digitalWrite(reqn_pin, LOW);
+#if NRF_DEBUG
+        Serial.print("transmitReceive: called with transmission, command ");
+        Serial.println(txCommand);
+#endif
+    } else {
+        nrf_debug("transmitReceive: called in polling mode");
     }
     
     // TODO: Timeout
