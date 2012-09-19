@@ -98,10 +98,13 @@ nRF8001::nRF8001(uint8_t reset_pin_arg,
     digitalWrite(rdyn_pin, HIGH);
     digitalWrite(reqn_pin, HIGH);
 
-    pinMode(reset_pin, OUTPUT);
-    digitalWrite(reset_pin, LOW);
-    delayMicroseconds(1);
-    digitalWrite(reset_pin, HIGH);
+    // Only do this if reset_pin is not -1
+    if (reset_pin != -1) {
+        pinMode(reset_pin, OUTPUT);
+        digitalWrite(reset_pin, LOW);
+        delayMicroseconds(1);
+        digitalWrite(reset_pin, HIGH);        
+    }
 
     // inialize SPI
     pinMode(SCK, OUTPUT);
