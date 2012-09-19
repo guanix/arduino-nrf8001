@@ -16,9 +16,9 @@ and sends the nRF8001’s internal temperature reading as heart rate and the
 fixed number 78 as battery level. It assumes the following pin assignments,
 easily changed:
 
-* RESET on digital pin 5
-* REQN on digital pin 6
-* RDYN on digital pin 7
+* RESET on digital pin 7
+* REQN on digital pin 8
+* RDYN on digital pin 9
 
 This library uses the AVR chip’s hardware SPI support, so the SCK (CLK),
 MISO and MOSI pins cannot be changed:

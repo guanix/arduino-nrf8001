@@ -8,6 +8,11 @@
 #define HEARTRATE_PIPE 5
 #define BATTERY_PIPE 8
 
+// change nRF8001 reset pin to -1 if it's not connected
+#define RESET_PIN 7
+#define REQN_PIN 8
+#define RDYN_PIN 9
+
 nRF8001 *nrf;
 
 float temperatureC;
@@ -37,8 +42,8 @@ void setup() {
   Serial.println("Hello");
   
   // nRF8001 class initialized with pin numbers
-  nrf = new nRF8001(5, 6, 7);
-  
+  nrf = new nRF8001(RESET_PIN, REQN_PIN, RDYN_PIN);
+
   // Register event handles
   nrf->setEventHandler(&eventHandler);
   nrf->setTemperatureHandler(&temperatureHandler);
