@@ -24,10 +24,12 @@ nRFCmd nRF8001::setup()
     for (;;) {
         nrf_debug("Calling transmitReceive...");
         transmitReceive(0, 0);
-        if (deviceState == PreSetup) {
+        if (deviceState == Setup || deviceState == PreSetup) {
             // Start the setup process
             nextSetupMessage = 0;
             break;
+        } else {
+            nrf_debug("Received message in setup but device not ready for setup");
         }
     }
 
