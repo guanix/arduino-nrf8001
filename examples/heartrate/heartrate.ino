@@ -10,8 +10,8 @@
 
 // change nRF8001 reset pin to -1 if it's not connected
 #define RESET_PIN 7
-#define REQN_PIN 8
-#define RDYN_PIN 9
+#define REQN_PIN 9
+#define RDYN_PIN 8
 
 nRF8001 *nrf;
 
