@@ -176,10 +176,10 @@ void nRF8001::debugEvent(nRFEvent *event)
 
             Serial.print(F("Hardware error: "));
             switch (event->msg.deviceStarted.hwError) {
-                case 0x01:
+                case 0x00:
                     Serial.println(F("No error"));
                     break;
-                case 0x02:
+                case 0x01:
                     Serial.println(F("Fatal error"));
                     break;
                 default:
