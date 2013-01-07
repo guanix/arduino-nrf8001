@@ -5,6 +5,7 @@
 
 #ifndef NRF_DEBUG
 #define NRF_DEBUG 1
+//#define NRF_VERBOSE_DEBUG 1
 #endif
 
 typedef uint8_t nRFLen;
