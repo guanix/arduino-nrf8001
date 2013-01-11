@@ -38,7 +38,7 @@ nRFCmd nRF8001::setup()
             && nextSetupMessage < NB_SETUP_MESSAGES
             && nextSetupMessage > previousMessageSent) {
 #if NRF_DEBUG
-            Serial.print("sending setup message number ");
+            Serial.print(F("sending setup message number "));
             Serial.println(nextSetupMessage);
 #endif
             transmitReceive((nRFCommand *)setup_msgs[nextSetupMessage]
@@ -139,7 +139,7 @@ void nRF8001::addressToString(char *str, uint8_t *address)
 
 void nRF8001::debugAddress(uint8_t *address)
 {
-    Serial.print("0x");
+    Serial.print(F("0x"));
     // Addresses are NRF_ADDRESS_LENGTH long, MSB to LSB
     char buf[NRF_ADDRESS_LENGTH*2+1];
     addressToString(buf, address);
@@ -194,7 +194,10 @@ void nRF8001::debugEvent(nRFEvent *event)
             Serial.println(F("EchoEvent"));
             break;
         case NRF_HARDWAREERROREVENT:
-            Serial.println(F("HardwareErrorEvent"));
+            Serial.print(F("HardwareErrorEvent!  Line: "));
+            Serial.print(event->msg.hardwareError.lineNo);
+            Serial.print(F(", File: "));
+            Serial.println((char *)event->msg.hardwareError.fileName);
             break;
         case NRF_COMMANDRESPONSEEVENT:
             Serial.println(F("CommandResponseEvent"));
@@ -349,13 +352,13 @@ void nRF8001::debugEvent(nRFEvent *event)
                     Serial.println(F("GetBatteryLevel"));
                     Serial.print(event->msg.commandResponse
                         .data.voltage*3.52, 2);
-                    Serial.println("mV");
+                    Serial.println(F("mV"));
                     break;
                 case NRF_GETTEMPERATURE_OP:
                     Serial.println(F("GetTemperature"));
                     Serial.print(event->msg.commandResponse
                         .data.temperature/4.0, 2);
-                    Serial.println(" C");
+                    Serial.println(F(" C"));
                     break;
                 case NRF_SETUP_OP:
                     Serial.println(F("Setup"));
@@ -457,7 +460,7 @@ void nRF8001::debugEvent(nRFEvent *event)
 
             Serial.print(F("Peer address: "));
             debugAddress(event->msg.connected.peerAddress);
-            Serial.println("");
+            Serial.println();
 
             Serial.print(F("Connection interval: "));
             Serial.print(event->msg.connected.connectionInterval/1.25, 2);
@@ -527,7 +530,7 @@ void nRF8001::debugEvent(nRFEvent *event)
             Serial.print(F("BtLeStatus: 0x"));
             uint8_t btLeStatus = event->msg.disconnected.btLeStatus;
             if (btLeStatus < 0x10) {
-                Serial.print("0");
+                Serial.print(F("0"));
             }
             Serial.println(btLeStatus, HEX);
             break;
@@ -541,7 +544,7 @@ void nRF8001::debugEvent(nRFEvent *event)
             
             Serial.print(F("Open: "));
             for (int i = 0; i < 64; i++) {
-                if (event->msg.pipeStatus.pipesOpen & 1<<i) {
+                if (event->msg.pipeStatus.pipesOpen & ((uint64_t)1)<<i) {
                     Serial.print(" ");
                     Serial.print(i, DEC);
                 }
@@ -550,12 +553,12 @@ void nRF8001::debugEvent(nRFEvent *event)
 
             Serial.print(F("Closed: "));
             for (int i = 0; i < 64; i++) {
-                if (event->msg.pipeStatus.pipesClosed & 1<<i) {
+                if (event->msg.pipeStatus.pipesClosed & ((uint64_t)1)<<i) {
                     Serial.print(" ");
                     Serial.print(i, DEC);
                 }
             }
-            Serial.println("");
+            Serial.println();
             break;
         case NRF_TIMINGEVENT:
             Serial.println(F("TimingEvent"));
@@ -576,19 +579,18 @@ void nRF8001::debugEvent(nRFEvent *event)
             for (int i = 0; i < NRF_PASSKEY_LENGTH; i++) {
                 Serial.print(event->msg.passkey[i]);
             }
-            Serial.println("");
+            Serial.println();
             break;
         case NRF_KEYREQUESTEVENT:
             Serial.println(F("KeyRequestEvent"));
             break;
         case NRF_DATACREDITEVENT:
-            Serial.println(F("DataCreditEvent"));
-            Serial.print(event->msg.dataCredits);
-            Serial.println(" credits");
+            Serial.print(F("DataCreditEvent credits="));
+            Serial.println(event->msg.dataCredits);
             break;
         case NRF_PIPEERROREVENT:
             Serial.println(F("PipeErrorEvent"));
-            Serial.print("Pipe: ");
+            Serial.print(F("Pipe: "));
             Serial.println(event->msg.pipeError.servicePipeNo);
 
             Serial.print("Error code: 0x");
@@ -596,16 +598,16 @@ void nRF8001::debugEvent(nRFEvent *event)
             break;
         case NRF_DATARECEIVEDEVENT:
             Serial.println(F("DataReceivedEvent"));
-            Serial.print("Pipe: ");
+            Serial.print(F("Pipe: "));
             Serial.println(event->msg.dataReceived.servicePipeNo);
             break;
         case NRF_DATAACKEVENT:
             Serial.println(F("DataAckEvent"));
-            Serial.print("Pipe: ");
+            Serial.print(F("Pipe: "));
             Serial.println(event->msg.servicePipeNo);
             break;
         default:
-            Serial.print("Unknown ");
+            Serial.print(F("Unknown "));
             Serial.println(event->event);
             break;
     }
@@ -654,25 +656,29 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
     // Bring REQN low
     if (txLength > 0) {
         digitalWrite(reqn_pin, LOW);
-#if NRF_DEBUG
-        Serial.print("transmitReceive: called with transmission, command ");
+#if NRF_VERBOSE_DEBUG
+        Serial.print(F("transmitReceive: called with transmission, command "));
         Serial.println(txCommand);
 #endif
     } else {
+#if NRF_VERBOSE_DEBUG
         nrf_debug("transmitReceive: called in polling mode");
+#endif
     }
     
     // TODO: Timeout
 
     if (txLength > 0 || timeout == 0) {
         // Wait for RDYN low indefinitely
+#if NRF_VERBOSE_DEBUG
         nrf_debug("waiting for RDYN low indefinitely");
+#endif
         while (digitalRead(rdyn_pin) == HIGH);
     } else {
-#if NRF_DEBUG
-        Serial.print("polling for ");
+#if NRF_VERBOSE_DEBUG
+        Serial.print(F("polling for "));
         Serial.print(timeout);
-        Serial.println("ms");
+        Serial.println(F("ms"));
 #endif
         uint8_t rdy = 0;
         // Wait for RDYN low for 1 ms at a time
@@ -694,7 +700,9 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
         digitalWrite(reqn_pin, LOW);
     }
 
+#if NRF_VERBOSE_DEBUG
     nrf_debug("Ready to transmitReceive full duplex!");
+#endif
 
     // Send length and command bytes,
     // receive debug and length bytes
@@ -757,7 +765,7 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
         case NRF_COMMANDRESPONSEEVENT: {
             if (rxEvent->msg.commandResponse.status != 0x00) {
 #if NRF_DEBUG
-                Serial.print("non-success command response event: 0x");
+                Serial.print(F("non-success command response event: 0x"));
                 Serial.println(rxEvent->msg.commandResponse.status);
 #endif
                 if (commandResponseHandler != 0) {
@@ -895,6 +903,8 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
                 dataAckHandler(rxEvent->msg.servicePipeNo);
             }
             break;
+        case NRF_HARDWAREERROREVENT:
+            break;
         default: {
             break;
         }
@@ -939,7 +949,7 @@ nRFTxStatus nRF8001::poll()
 
 uint8_t nRF8001::isPipeOpen(nRFPipe servicePipeNo)
 {
-    return pipesOpen & 1<<servicePipeNo;
+    return (pipesOpen & ((uint64_t)1) << servicePipeNo) != 0;
 }
 
 // Transmit functions
@@ -1049,6 +1059,11 @@ nRFTxStatus nRF8001::setTxPower(uint8_t powerLevel)
 nRFTxStatus nRF8001::getDeviceAddress()
 {
     return transmitCommand(NRF_GETDEVICEADDRESS_OP);
+}
+
+nRFTxStatus nRF8001::getDeviceVersion()
+{
+    return transmitCommand(NRF_GETDEVICEVERSION_OP);
 }
 
 nRFTxStatus nRF8001::connect(uint16_t timeout, uint16_t advInterval)
@@ -1267,7 +1282,7 @@ nRFTxStatus nRF8001::sendData(nRFPipe servicePipeNo,
         return NotConnected;
     }
 
-    if (!(pipesOpen & 1<<servicePipeNo)) {
+    if (!(pipesOpen & ((uint64_t)1)<<servicePipeNo)) {
         nrf_debug("pipe not open");
         return PipeNotOpen;
     }
