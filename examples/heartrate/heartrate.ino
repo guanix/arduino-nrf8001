@@ -9,6 +9,8 @@
 #define BATTERY_PIPE 8
 
 // change nRF8001 reset pin to -1 if it's not connected
+// Redbear BLE Shield users: to my knowledge reset pin is not connected so use -1!
+// NOTE: if you choose -1, youll need to manually reset your device after powerup!!
 #define RESET_PIN 7
 #define REQN_PIN 9
 #define RDYN_PIN 8
