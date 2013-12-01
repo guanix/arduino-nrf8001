@@ -17,8 +17,8 @@ fixed number 78 as battery level. It assumes the following pin assignments,
 easily changed:
 
 * RESET on digital pin 7
-* REQN on digital pin 8
-* RDYN on digital pin 9
+* REQN on digital pin 9
+* RDYN on digital pin 8
 
 This library uses the AVR chip’s hardware SPI support, so the SCK (CLK),
 MISO and MOSI pins cannot be changed:
