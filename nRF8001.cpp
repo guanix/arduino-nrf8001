@@ -3,14 +3,19 @@
 #include <assert.h>
 #include <avr/interrupt.h>
 #include "nRF8001.h"
-#include "services.h"
 
 #ifdef PROGMEM
 #undef PROGMEM
 #define PROGMEM __attribute__((section(".progmem.data")))
 #endif
 
-hal_aci_data_t setup_msgs[NB_SETUP_MESSAGES] = SETUP_MESSAGES_CONTENT;
+typedef struct {
+    uint8_t status_byte;
+    uint8_t buffer[32];
+} hal_aci_data_t;
+
+extern int nrfSetupMessages;
+extern hal_aci_data_t setup_msgs[];
 
 nRFDeviceState nRF8001::getDeviceState()
 {
@@ -35,7 +40,7 @@ nRFCmd nRF8001::setup()
 
     for (;;) {
         if (nextSetupMessage >= 0
-            && nextSetupMessage < NB_SETUP_MESSAGES
+            && nextSetupMessage < nrfSetupMessages
             && nextSetupMessage > previousMessageSent) {
 #if NRF_DEBUG
             Serial.print(F("sending setup message number "));
@@ -78,22 +83,6 @@ nRF8001::nRF8001(uint8_t reset_pin_arg,
     nextSetupMessage = -2;
     connectionStatus = Disconnected;
 
-    // Zero all the handlers
-    listener = 0;
-    commandResponseHandler = 0;
-    temperatureHandler = 0;
-    batteryLevelHandler = 0;
-    deviceVersionHandler = 0;
-    deviceAddressHandler = 0;
-    dynamicDataHandler = 0;
-    connectedHandler = 0;
-    disconnectedHandler = 0;
-    bondStatusHandler = 0;
-    keyRequestHandler = 0;
-    pipeErrorHandler = 0;
-    dataReceivedHandler = 0;
-    dataAckHandler = 0;
-
     // Prepare pins and start SPI
     pinMode(reqn_pin, OUTPUT);
     pinMode(rdyn_pin, INPUT);
@@ -124,9 +113,6 @@ nRF8001::nRF8001(uint8_t reset_pin_arg,
     SPI.begin();
 
     // Load up the first setup message and start interrupts
-#if NB_SETUP_MESSAGES < 1
-#error Make sure you included devices.h from nRFgo Studio, or try services.h.example
-#endif
 }
 
 void nRF8001::addressToString(char *str, uint8_t *address)
@@ -768,11 +754,6 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
                 Serial.print(F("non-success command response event: 0x"));
                 Serial.println(rxEvent->msg.commandResponse.status);
 #endif
-                if (commandResponseHandler != 0) {
-                    commandResponseHandler(
-                        rxEvent->msg.commandResponse.opcode,
-                        rxEvent->msg.commandResponse.status);
-                }
 
                 if (rxEvent->msg.commandResponse.opcode == NRF_SETUP_OP &&
                     rxEvent->msg.commandResponse.status ==
@@ -793,54 +774,16 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
                 case NRF_SETUP_OP:
                     break;
                 case NRF_GETTEMPERATURE_OP:
-                    if (temperatureHandler != 0) {
-                        temperatureHandler(rxEvent->msg.commandResponse
-                            .data.temperature / 4.0);
-                    }
                     break;
                 case NRF_GETBATTERYLEVEL_OP:
-                    if (batteryLevelHandler != 0) {
-                        batteryLevelHandler(rxEvent->msg.commandResponse
-                            .data.voltage * 0.00352);
-                    }
                     break;
                 case NRF_GETDEVICEVERSION_OP:
-                    if (deviceVersionHandler != 0) {
-                        deviceVersionHandler(
-                            rxEvent->msg.commandResponse
-                                .data.getDeviceVersion.configurationId,
-                            rxEvent->msg.commandResponse
-                                .data.getDeviceVersion.aciVersion,
-                            rxEvent->msg.commandResponse
-                                .data.getDeviceVersion.setupFormat,
-                            rxEvent->msg.commandResponse
-                                .data.getDeviceVersion.configurationStatus);
-                    }
                     break;
                 case NRF_GETDEVICEADDRESS_OP:
-                    if (deviceAddressHandler != 0) {
-                        deviceAddressHandler(
-                            rxEvent->msg.commandResponse
-                                .data.getDeviceAddress.deviceAddress,
-                            rxEvent->msg.commandResponse
-                                .data.getDeviceAddress.addressType);
-                    }
                     break;
                 case NRF_READDYNAMICDATA_OP:
-                    if (dynamicDataHandler != 0) {
-                        dynamicDataHandler(
-                           rxEvent->msg.commandResponse
-                                .data.readDynamicData.sequenceNo,
-                            rxEvent->msg.commandResponse
-                                .data.readDynamicData.dynamicData);
-                    }
                     break;
                 default:
-                    if (commandResponseHandler != 0) {
-                        commandResponseHandler(
-                            rxEvent->msg.commandResponse.opcode,
-                            rxEvent->msg.commandResponse.status);
-                    }
                     break;
             }
 
@@ -849,22 +792,10 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
         }
         case NRF_CONNECTEDEVENT:
             connectionStatus = Connected;
-            if (connectedHandler != 0) {
-                connectedHandler(
-                    rxEvent->msg.connected.addressType,
-                    rxEvent->msg.connected.peerAddress,
-                    0);
-                // TODO: put in other data
-            }
             break;
         case NRF_DISCONNECTEDEVENT:
             connectionStatus = Disconnected;
             pipesOpen = 0;
-            if (disconnectedHandler != 0) {
-                disconnectedHandler(
-                    rxEvent->msg.disconnected.aciStatus,
-                    rxEvent->msg.disconnected.btLeStatus);
-            }
             break;
         case NRF_DATACREDITEVENT:
             credits += rxEvent->msg.dataCredits;
@@ -873,47 +804,21 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
             pipesOpen = rxEvent->msg.pipeStatus.pipesOpen;
             break;
         case NRF_BONDSTATUSEVENT:
-            if (bondStatusHandler != 0) {
-                bondStatusHandler(0);
-            }
             // TODO: put in bond status data
             break;
         case NRF_KEYREQUESTEVENT:
-            if (keyRequestHandler != 0) {
-                keyRequestHandler(rxEvent->msg.keyType);
-            }
             break;
         case NRF_PIPEERROREVENT:
-            if (pipeErrorHandler != 0) {
-                pipeErrorHandler(
-                    rxEvent->msg.pipeError.servicePipeNo,
-                    rxEvent->msg.pipeError.errorCode,
-                    rxEvent->msg.pipeError.rawData);
-            }
             break;
         case NRF_DATARECEIVEDEVENT:
-            if (dataReceivedHandler != 0) {
-                dataReceivedHandler(
-                    rxEvent->msg.dataReceived.servicePipeNo,
-                    rxEvent->msg.dataReceived.data);
-            }
             break;
         case NRF_DATAACKEVENT:
-            if (dataAckHandler != 0) {
-                dataAckHandler(rxEvent->msg.servicePipeNo);
-            }
             break;
         case NRF_HARDWAREERROREVENT:
             break;
         default: {
             break;
         }
-    }
-
-    // Dispatch event
-    if (listener != 0) {
-        // first to generic handler
-        listener(rxEvent);
     }
 
     return Success;
@@ -1347,76 +1252,4 @@ nRFTxStatus nRF8001::sendDataNack(nRFPipe servicePipeNo, uint8_t errorCode)
     cmd.content.sendDataNack.errorCode = errorCode;
 
     return transmitReceive(&cmd, 0);
-}
-
-// Event handler registration
-
-void nRF8001::setEventHandler(nRFEventHandler handler)
-{
-    listener = handler;
-}
-
-void nRF8001::setCommandResponseHandler(nRFCommandResponseHandler handler)
-{
-    commandResponseHandler = handler;
-}
-
-void nRF8001::setTemperatureHandler(nRFTemperatureHandler handler)
-{
-    temperatureHandler = handler;
-}
-
-void nRF8001::setBatteryLevelHandler(nRFBatteryLevelHandler handler)
-{
-    batteryLevelHandler = handler;
-}
-
-void nRF8001::setDeviceVersionHandler(nRFDeviceVersionHandler handler)
-{
-    deviceVersionHandler = handler;
-}
-
-void nRF8001::setDeviceAddressHandler(nRFDeviceAddressHandler handler)
-{
-    deviceAddressHandler = handler;
-}
-
-void nRF8001::setDynamicDataHandler(nRFDynamicDataHandler handler)
-{
-    dynamicDataHandler = handler;
-}
-
-void nRF8001::setConnectedHandler(nRFConnectedHandler handler)
-{
-    connectedHandler = handler;
-}
-
-void nRF8001::setDisconnectedHandler(nRFDisconnectedHandler handler)
-{
-    disconnectedHandler = handler;
-}
-
-void nRF8001::setBondStatusHandler(nRFBondStatusHandler handler)
-{
-    bondStatusHandler = handler;
-}
-
-void nRF8001::setKeyRequestHandler(nRFKeyRequestHandler handler)
-{
-    keyRequestHandler = handler;
-}
-
-void nRF8001::setPipeErrorHandler(nRFPipeErrorHandler handler)
-{
-    pipeErrorHandler = handler;
-}
-
-void nRF8001::setDataReceivedHandler(nRFDataReceivedHandler handler)
-{
-    dataReceivedHandler = handler;
-}
-
-void nRF8001::setDataAckHandler(nRFDataAckHandler handler)
-{
-    dataAckHandler = handler;
 }
