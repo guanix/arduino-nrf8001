@@ -29,6 +29,15 @@ typedef struct {
     uint8_t buffer[32];
 } hal_aci_data_t;
 
+// This data structure is stored inside the nRF8001 class and
+// contains pointers to where we should actually put the data
+// for automatically managed pipes.
+typedef struct {
+    void *value;
+    size_t maxLength;
+    bool *changedAfterLastRead;
+} pipe_value_t;
+
 class nRF8001
 {
     private:
@@ -40,6 +49,8 @@ class nRF8001
         nRFDeviceState deviceState;
         int8_t nextSetupMessage;
         nRFConnectionStatus connectionStatus;
+        uint8_t managedPipeCount;
+        pipe_value_t **managedPipes;
 
         nRFTxStatus transmitReceive(nRFCommand *txCmd, uint16_t timeout);
         nRFTxStatus transmitCommand(uint8_t command);
@@ -57,7 +68,7 @@ class nRF8001
         nRFDeviceState getDeviceState();
         nRFCmd setup(int setupMessageCount, hal_aci_data_t *setupMessages);
 
-        nRF8001(uint8_t reset_pin,
+        void begin(uint8_t reset_pin,
                    uint8_t reqn_pin,
                    uint8_t rdyn_pin);
 
@@ -115,8 +126,8 @@ class nRF8001
 template<class T>
 class nRFPipe {
 public:
-    nRFPipe(nRF8001 *nrf, nRFPipeNo pipeNo, nRFLen maxLength);
-    nRFPipe(nRF8001 *nrf, nRFPipeNo pipeNo);
+    void begin(nRF8001 *nrf, nRFPipeNo pipeNo, nRFLen maxLength);
+    void begin(nRF8001 *nrf, nRFPipeNo pipeNo);
 
     bool changed();
     void write(T newval);
@@ -129,6 +140,7 @@ private:
     nRFLen maxLength;
     nRF8001 *nrfInstance;
     nRFPipeNo pipeNo;
+
 };
 
 #endif /* _NRF8001_H */

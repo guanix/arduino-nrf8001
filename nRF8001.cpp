@@ -59,7 +59,7 @@ nRFCmd nRF8001::setup(int setupMessageCount, hal_aci_data_t *setupMessages)
 
 }
 
-nRF8001::nRF8001(uint8_t reset_pin_arg,
+void nRF8001::begin(uint8_t reset_pin_arg,
                  uint8_t reqn_pin_arg,
                  uint8_t rdyn_pin_arg)
 {
@@ -103,7 +103,7 @@ nRF8001::nRF8001(uint8_t reset_pin_arg,
     SPI.setClockDivider(SPI_CLOCK_DIV16);
     SPI.begin();
 
-    // Load up the first setup message and start interrupts
+    managedPipes = NULL;
 }
 
 void nRF8001::addressToString(char *str, uint8_t *address)
@@ -1245,16 +1245,30 @@ nRFTxStatus nRF8001::sendDataNack(nRFPipeNo servicePipeNo, uint8_t errorCode)
     return transmitReceive(&cmd, 0);
 }
 
+// For pointer types
 template<class T>
-nRFPipe<T>::nRFPipe(nRF8001 *nrf, nRFPipeNo servicePipeNo, nRFLen maxLengthIn)
+void nRFPipe<T>::begin(nRF8001 *nrf, nRFPipeNo servicePipeNo, nRFLen maxLengthIn)
 {
     maxLength = maxLengthIn;
     nrfInstance = nrf;
     pipeNo = servicePipeNo;
     changedAfterLastRead = false;
-    memset(&value, 0, sizeof(T));
+    memset(&value, 0, maxLengthIn); // necessary in C++?
 }
 
+// For single types
+template<class T>
+void nRFPipe<T>::begin(nRF8001 *nrf, nRFPipeNo servicePipeNo)
+{
+    maxLength = sizeof(T);
+    nrfInstance = nrf;
+    pipeNo = servicePipeNo;
+    changedAfterLastRead = false;
+    memset(&value, 0, maxLength);
+}
+
+// Apparently we need this to define class methods for templated classes
+// outside the .h file.
 template class nRFPipe<uint8_t>;
 template class nRFPipe<uint16_t>;
 template class nRFPipe<uint32_t>;
