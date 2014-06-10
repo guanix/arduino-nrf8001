@@ -5,8 +5,9 @@
 #include <SPI.h>
 #include <nRF8001.h>
 
-#define HEARTRATE_PIPE 5
-#define BATTERY_PIPE 8
+#include "services.h"
+
+hal_aci_data_t setup_msgs[NB_SETUP_MESSAGES] = SETUP_MESSAGES_CONTENT;
 
 // change nRF8001 reset pin to -1 if it's not connected
 // Redbear BLE Shield users: to my knowledge reset pin is not connected so use -1!
@@ -49,7 +50,7 @@ void setup() {
   // Register event handles
   nrf->setEventHandler(&eventHandler);
   nrf->setTemperatureHandler(&temperatureHandler);
-  if ((nrf->setup()) == cmdSuccess) {
+  if ((nrf->setup(setup_msgs, NB_SETUP_MESSAGES)) == cmdSuccess) {
     Serial.println("SUCCESS");
   } else {
     Serial.println("FAIL");
@@ -80,19 +81,19 @@ void loop() {
   nrf->poll(2000);
   
   // If heart rate pipe is open
-  if (nrf->isPipeOpen(HEARTRATE_PIPE) && (millis() - lastSent) > 1000 && temperatureC > 0.0 && nrf->creditsAvailable()) {
+  if (nrf->isPipeOpen(PIPE_HEART_RATE_HEART_RATE_MEASUREMENT_TX) && (millis() - lastSent) > 1000 && temperatureC > 0.0 && nrf->creditsAvailable()) {
     Serial.println("ready to send data");
     uint8_t temp[2];
     temp[0] = 0;
     temp[1] = round(temperatureC);
     
-    nrf->sendData(HEARTRATE_PIPE, 2, (uint8_t *)&temp);
+    nrf->sendData(PIPE_HEART_RATE_HEART_RATE_MEASUREMENT_TX, 2, (uint8_t *)&temp);
     lastSent = millis();
     uint8_t bat = 78;
     
     // If battery pipe is open
-    if (nrf->isPipeOpen(BATTERY_PIPE) && nrf->creditsAvailable()) {
-      nrf->sendData(BATTERY_PIPE, 1, &bat);
+    if (nrf->isPipeOpen(PIPE_BATTERY_BATTERY_LEVEL_TX) && nrf->creditsAvailable()) {
+      nrf->sendData(PIPE_BATTERY_BATTERY_LEVEL_TX, 1, &bat);
     }
     
     // get new temperature
