@@ -641,7 +641,7 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
     if (txLength &&
        (txCmd->command == NRF_SENDDATA_OP
      || txCmd->command == NRF_REQUESTDATA_OP
-     || txCmd->command == NRF_SETLOCALDATA_OP
+     //|| txCmd->command == NRF_SETLOCALDATA_OP
      || txCmd->command == NRF_SENDDATAACK_OP
      || txCmd->command == NRF_SENDDATANACK_OP)) {
         if (credits < 1) {
