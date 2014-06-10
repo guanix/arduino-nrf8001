@@ -3,21 +3,18 @@
 #include <assert.h>
 #include <avr/interrupt.h>
 #include "nRF8001.h"
-#include "services.h"
 
 #ifdef PROGMEM
 #undef PROGMEM
 #define PROGMEM __attribute__((section(".progmem.data")))
 #endif
 
-hal_aci_data_t setup_msgs[NB_SETUP_MESSAGES] = SETUP_MESSAGES_CONTENT;
-
 nRFDeviceState nRF8001::getDeviceState()
 {
     return deviceState;
 }
 
-nRFCmd nRF8001::setup()
+nRFCmd nRF8001::setup(hal_aci_data_t setup_msgs[], uint8_t nb_setup_msgs)
 {
     int previousMessageSent = -1;
     nrf_debug("Waiting for Standby state");
@@ -35,7 +32,7 @@ nRFCmd nRF8001::setup()
 
     for (;;) {
         if (nextSetupMessage >= 0
-            && nextSetupMessage < NB_SETUP_MESSAGES
+            && nextSetupMessage < nb_setup_msgs
             && nextSetupMessage > previousMessageSent) {
 #if NRF_DEBUG
             Serial.print(F("sending setup message number "));
@@ -124,9 +121,6 @@ nRF8001::nRF8001(uint8_t reset_pin_arg,
     SPI.begin();
 
     // Load up the first setup message and start interrupts
-#if NB_SETUP_MESSAGES < 1
-#error Make sure you included devices.h from nRFgo Studio, or try services.h.example
-#endif
 }
 
 void nRF8001::addressToString(char *str, uint8_t *address)

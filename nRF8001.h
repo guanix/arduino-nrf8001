@@ -89,7 +89,7 @@ class nRF8001
         nRFTxStatus poll(uint16_t timeout);
         nRFTxStatus poll();
         nRFDeviceState getDeviceState();
-        nRFCmd setup();
+        nRFCmd setup(hal_aci_data_t setup_msgs[], uint8_t nb_setup_msgs);
 
         nRF8001(uint8_t reset_pin,
                    uint8_t reqn_pin,
