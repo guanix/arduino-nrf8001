@@ -9,7 +9,7 @@
 #endif
 
 typedef uint8_t nRFLen;
-typedef uint8_t nRFPipe;
+typedef uint8_t nRFPipeNo;
 
 #include "constants.h"
 #include "data.h" // data structures for requests and responses
@@ -23,6 +23,11 @@ typedef uint8_t nRFPipe;
 #define nrf_debug(msg)
 #define nrf_debugnl(msg)
 #endif
+
+typedef struct {
+    uint8_t status_byte;
+    uint8_t buffer[32];
+} hal_aci_data_t;
 
 class nRF8001
 {
@@ -38,17 +43,19 @@ class nRF8001
 
         nRFTxStatus transmitReceive(nRFCommand *txCmd, uint16_t timeout);
         nRFTxStatus transmitCommand(uint8_t command);
-        nRFTxStatus transmitPipeCommand(uint8_t command, nRFPipe pipe);
+        nRFTxStatus transmitPipeCommand(uint8_t command, nRFPipeNo pipe);
 
     public:
         void debugEvent(nRFEvent *event);
         void debugAddress(uint8_t *address);
         void addressToString(char *str, uint8_t *address);
 
+        nRFTxStatus loop();
+
         nRFTxStatus poll(uint16_t timeout);
         nRFTxStatus poll();
         nRFDeviceState getDeviceState();
-        nRFCmd setup();
+        nRFCmd setup(int setupMessageCount, hal_aci_data_t *setupMessages);
 
         nRF8001(uint8_t reset_pin,
                    uint8_t reqn_pin,
@@ -58,7 +65,7 @@ class nRF8001
         uint8_t isConnected();
         nRFConnectionStatus getConnectionStatus();
 
-        uint8_t isPipeOpen(nRFPipe servicePipeNo);
+        uint8_t isPipeOpen(nRFPipeNo servicePipeNo);
 
         nRFTxStatus test(uint8_t feature);
         nRFTxStatus sleep();
@@ -70,6 +77,7 @@ class nRF8001
         nRFTxStatus setTxPower(uint8_t powerLevel);
         nRFTxStatus getDeviceAddress();
         nRFTxStatus connect(uint16_t timeout, uint16_t advInterval);
+        nRFTxStatus connect();
         nRFTxStatus radioReset();
         nRFTxStatus bond(uint16_t timeout, uint16_t advInterval);
         nRFTxStatus disconnect(uint8_t reason);
@@ -77,8 +85,8 @@ class nRF8001
                                    uint16_t intervalMax,
                                    uint16_t slaveLatency,
                                    uint16_t timeout);
-        nRFTxStatus openRemotePipe(nRFPipe servicePipeNo);
-        nRFTxStatus closeRemotePipe(nRFPipe servicePipeNo);
+        nRFTxStatus openRemotePipe(nRFPipeNo servicePipeNo);
+        nRFTxStatus closeRemotePipe(nRFPipeNo servicePipeNo);
         nRFTxStatus dtmCommand(uint16_t dtmCmd);
         nRFTxStatus readDynamicData();
         nRFTxStatus writeDynamicData(uint8_t seqNo,
@@ -91,16 +99,36 @@ class nRF8001
         nRFTxStatus broadcast(uint16_t timeout, uint16_t advInterval);
         nRFTxStatus bondSecurityRequest();
         nRFTxStatus directedConnect();
-        nRFTxStatus sendData(nRFPipe servicePipeNo,
+        nRFTxStatus sendData(nRFPipeNo servicePipeNo,
                            nRFLen dataLength,
                            uint8_t *data);
-        nRFTxStatus requestData(nRFPipe servicePipeNo);
-        nRFTxStatus setLocalData(nRFPipe servicePipeNo,
+        nRFTxStatus requestData(nRFPipeNo servicePipeNo);
+        nRFTxStatus setLocalData(nRFPipeNo servicePipeNo,
                                nRFLen dataLength,
                                uint8_t *data);
-        nRFTxStatus sendDataAck(nRFPipe servicePipeNo);
-        nRFTxStatus sendDataNack(nRFPipe servicePipeNo,
+        nRFTxStatus sendDataAck(nRFPipeNo servicePipeNo);
+        nRFTxStatus sendDataNack(nRFPipeNo servicePipeNo,
                                uint8_t errorCode);
+};
+
+// A characteristic that we will set up
+template<class T>
+class nRFPipe {
+public:
+    nRFPipe(nRF8001 *nrf, nRFPipeNo pipeNo, nRFLen maxLength);
+    nRFPipe(nRF8001 *nrf, nRFPipeNo pipeNo);
+
+    bool changed();
+    void write(T newval);
+    T read(void);
+    void set(T newval);
+
+private:
+    bool changedAfterLastRead;
+    T value;
+    nRFLen maxLength;
+    nRF8001 *nrfInstance;
+    nRFPipeNo pipeNo;
 };
 
 #endif /* _NRF8001_H */

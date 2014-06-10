@@ -9,20 +9,12 @@
 #define PROGMEM __attribute__((section(".progmem.data")))
 #endif
 
-typedef struct {
-    uint8_t status_byte;
-    uint8_t buffer[32];
-} hal_aci_data_t;
-
-extern int nrfSetupMessages;
-extern hal_aci_data_t setup_msgs[];
-
 nRFDeviceState nRF8001::getDeviceState()
 {
     return deviceState;
 }
 
-nRFCmd nRF8001::setup()
+nRFCmd nRF8001::setup(int setupMessageCount, hal_aci_data_t *setupMessages)
 {
     int previousMessageSent = -1;
     nrf_debug("Waiting for Standby state");
@@ -40,14 +32,13 @@ nRFCmd nRF8001::setup()
 
     for (;;) {
         if (nextSetupMessage >= 0
-            && nextSetupMessage < nrfSetupMessages
+            && nextSetupMessage < setupMessageCount
             && nextSetupMessage > previousMessageSent) {
 #if NRF_DEBUG
             Serial.print(F("sending setup message number "));
             Serial.println(nextSetupMessage);
 #endif
-            transmitReceive((nRFCommand *)setup_msgs[nextSetupMessage]
-                .buffer, 0);
+            transmitReceive((nRFCommand *)&setupMessages[nextSetupMessage].buffer, 0);
             previousMessageSent = nextSetupMessage;
         } else if (nextSetupMessage >= 0
             && nextSetupMessage > previousMessageSent) {
@@ -852,7 +843,7 @@ nRFTxStatus nRF8001::poll()
     return transmitReceive(0, 0);
 }
 
-uint8_t nRF8001::isPipeOpen(nRFPipe servicePipeNo)
+uint8_t nRF8001::isPipeOpen(nRFPipeNo servicePipeNo)
 {
     return (pipesOpen & ((uint64_t)1) << servicePipeNo) != 0;
 }
@@ -874,7 +865,7 @@ nRFTxStatus nRF8001::transmitCommand(uint8_t command)
     return transmitReceive(&cmd, 0);
 }
 
-nRFTxStatus nRF8001::transmitPipeCommand(uint8_t command, nRFPipe pipe)
+nRFTxStatus nRF8001::transmitPipeCommand(uint8_t command, nRFPipeNo pipe)
 {
     if (deviceState != Standby) {
         nrf_debug("device not in Standby state");
@@ -1055,12 +1046,12 @@ nRFTxStatus nRF8001::changeTimingRequest(uint16_t intervalMin,
     return transmitReceive(&cmd, 0);
 }
 
-nRFTxStatus nRF8001::openRemotePipe(nRFPipe servicePipeNo)
+nRFTxStatus nRF8001::openRemotePipe(nRFPipeNo servicePipeNo)
 {
     return transmitPipeCommand(NRF_OPENREMOTEPIPE_OP, servicePipeNo);
 }
 
-nRFTxStatus nRF8001::closeRemotePipe(nRFPipe servicePipeNo)
+nRFTxStatus nRF8001::closeRemotePipe(nRFPipeNo servicePipeNo)
 {
     return transmitPipeCommand(NRF_CLOSEREMOTEPIPE_OP, servicePipeNo);
 }
@@ -1174,7 +1165,7 @@ nRFTxStatus nRF8001::directedConnect()
     return transmitCommand(NRF_DIRECTEDCONNECT_OP);
 }
 
-nRFTxStatus nRF8001::sendData(nRFPipe servicePipeNo,
+nRFTxStatus nRF8001::sendData(nRFPipeNo servicePipeNo,
     nRFLen dataLength, uint8_t *data)
 {
     if (deviceState != Standby) {
@@ -1210,12 +1201,12 @@ nRFTxStatus nRF8001::sendData(nRFPipe servicePipeNo,
     return transmitReceive(&cmd, 0);
 }
 
-nRFTxStatus nRF8001::requestData(nRFPipe servicePipeNo)
+nRFTxStatus nRF8001::requestData(nRFPipeNo servicePipeNo)
 {
     return transmitPipeCommand(NRF_REQUESTDATA_OP, servicePipeNo);
 }
 
-nRFTxStatus nRF8001::setLocalData(nRFPipe servicePipeNo, nRFLen dataLength,
+nRFTxStatus nRF8001::setLocalData(nRFPipeNo servicePipeNo, nRFLen dataLength,
     uint8_t *data)
 {
     if (deviceState != Standby) {
@@ -1233,12 +1224,12 @@ nRFTxStatus nRF8001::setLocalData(nRFPipe servicePipeNo, nRFLen dataLength,
     return transmitReceive(&cmd, 0);
 }
 
-nRFTxStatus nRF8001::sendDataAck(nRFPipe servicePipeNo)
+nRFTxStatus nRF8001::sendDataAck(nRFPipeNo servicePipeNo)
 {
     return transmitPipeCommand(NRF_SENDDATAACK_OP, servicePipeNo);
 }
 
-nRFTxStatus nRF8001::sendDataNack(nRFPipe servicePipeNo, uint8_t errorCode)
+nRFTxStatus nRF8001::sendDataNack(nRFPipeNo servicePipeNo, uint8_t errorCode)
 {
     if (deviceState != Standby) {
         nrf_debug("device not in Standby state");
@@ -1253,3 +1244,25 @@ nRFTxStatus nRF8001::sendDataNack(nRFPipe servicePipeNo, uint8_t errorCode)
 
     return transmitReceive(&cmd, 0);
 }
+
+template<class T>
+nRFPipe<T>::nRFPipe(nRF8001 *nrf, nRFPipeNo servicePipeNo, nRFLen maxLengthIn)
+{
+    maxLength = maxLengthIn;
+    nrfInstance = nrf;
+    pipeNo = servicePipeNo;
+    changedAfterLastRead = false;
+    memset(&value, 0, sizeof(T));
+}
+
+template class nRFPipe<uint8_t>;
+template class nRFPipe<uint16_t>;
+template class nRFPipe<uint32_t>;
+template class nRFPipe<uint64_t>;
+template class nRFPipe<int8_t>;
+template class nRFPipe<int16_t>;
+template class nRFPipe<int32_t>;
+template class nRFPipe<int64_t>;
+template class nRFPipe<float>;
+template class nRFPipe<double>;
+template class nRFPipe<void *>;

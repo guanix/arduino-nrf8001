@@ -37,7 +37,7 @@ struct nRFCommand {
             uint16_t timeout;
         } changeTimingRequest;
 
-        nRFPipe servicePipeNo;
+        nRFPipeNo servicePipeNo;
 
         uint16_t dtmCommand;
 
@@ -171,18 +171,18 @@ struct nRFEvent {
         uint8_t dataCredits;
 
         struct {
-            nRFPipe servicePipeNo;
+            nRFPipeNo servicePipeNo;
             uint8_t errorCode;
 
             uint8_t rawData[NRF_PIPE_ERROR_LENGTH];
         } pipeError;
 
         struct {
-            nRFPipe servicePipeNo;
+            nRFPipeNo servicePipeNo;
             uint8_t data[NRF_DATA_LENGTH];
         } dataReceived;
 
-        nRFPipe servicePipeNo;
+        nRFPipeNo servicePipeNo;
     } msg;
 };
 
