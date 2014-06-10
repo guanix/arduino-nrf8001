@@ -33,10 +33,10 @@ typedef struct {
 // contains pointers to where we should actually put the data
 // for automatically managed pipes.
 typedef struct {
-    void *value;
+    void *valueArray;
     size_t maxLength;
     bool *changedAfterLastRead;
-} pipe_value_t;
+} pipe_data_t;
 
 class nRF8001
 {
@@ -49,28 +49,38 @@ class nRF8001
         nRFDeviceState deviceState;
         int8_t nextSetupMessage;
         nRFConnectionStatus connectionStatus;
+
         uint8_t managedPipeCount;
-        pipe_value_t **managedPipes;
+        // This is a double pointer because it will be malloc'ed
+        // in begin(). Not the best way to do this. If we had access
+        // to services.h here, we could use NUMBER_OF_PIPES.
+        pipe_data_t *managedPipes;
 
         nRFTxStatus transmitReceive(nRFCommand *txCmd, uint16_t timeout);
         nRFTxStatus transmitCommand(uint8_t command);
         nRFTxStatus transmitPipeCommand(uint8_t command, nRFPipeNo pipe);
+
+        bool reconnect;
 
     public:
         void debugEvent(nRFEvent *event);
         void debugAddress(uint8_t *address);
         void addressToString(char *str, uint8_t *address);
 
-        nRFTxStatus loop();
+        bool available();
+        bool loop();
 
         nRFTxStatus poll(uint16_t timeout);
         nRFTxStatus poll();
         nRFDeviceState getDeviceState();
         nRFCmd setup(int setupMessageCount, hal_aci_data_t *setupMessages);
 
+        bool registerManagedPipe(nRFPipeNo pipeNo, pipe_data_t *pipe_data);
+
         void begin(uint8_t reset_pin,
                    uint8_t reqn_pin,
-                   uint8_t rdyn_pin);
+                   uint8_t rdyn_pin,
+                   uint8_t pipeCount);
 
         uint8_t creditsAvailable();
         uint8_t isConnected();
@@ -87,8 +97,9 @@ class nRF8001
         nRFTxStatus getTemperature();
         nRFTxStatus setTxPower(uint8_t powerLevel);
         nRFTxStatus getDeviceAddress();
-        nRFTxStatus connect(uint16_t timeout, uint16_t advInterval);
+        nRFTxStatus connectOnce(uint16_t timeout, uint16_t advInterval);
         nRFTxStatus connect();
+        nRFTxStatus connectOnce();
         nRFTxStatus radioReset();
         nRFTxStatus bond(uint16_t timeout, uint16_t advInterval);
         nRFTxStatus disconnect(uint8_t reason);
@@ -123,11 +134,10 @@ class nRF8001
 };
 
 // A characteristic that we will set up
-template<class T>
+template<class T, int howMany = 1>
 class nRFPipe {
 public:
-    void begin(nRF8001 *nrf, nRFPipeNo pipeNo, nRFLen maxLength);
-    void begin(nRF8001 *nrf, nRFPipeNo pipeNo);
+    void begin(nRF8001 &nrf, nRFPipeNo pipeNo);
 
     bool changed();
     void write(T newval);
@@ -136,11 +146,28 @@ public:
 
 private:
     bool changedAfterLastRead;
-    T value;
+    T valueArray[howMany];
     nRFLen maxLength;
-    nRF8001 *nrfInstance;
     nRFPipeNo pipeNo;
-
 };
+
+// For obscure C++ reasons this has to be in the header file.
+// Probably won't be a big deal because most Arduino sketches
+// will only include this file once.
+template<class T, int howMany>
+void nRFPipe<T, howMany>::begin(nRF8001 &nrf, nRFPipeNo servicePipeNo)
+{
+    maxLength = sizeof(T)*howMany;
+    pipeNo = servicePipeNo;
+    changedAfterLastRead = false;
+    memset(valueArray, 0, maxLength); // necessary in C++?
+
+    pipe_data_t pipe_data;
+    pipe_data.valueArray = valueArray;
+    pipe_data.maxLength = sizeof(T)*howMany;
+    pipe_data.changedAfterLastRead = &changedAfterLastRead;
+
+    nrf.registerManagedPipe(servicePipeNo, &pipe_data);
+}
 
 #endif /* _NRF8001_H */

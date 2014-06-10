@@ -61,7 +61,8 @@ nRFCmd nRF8001::setup(int setupMessageCount, hal_aci_data_t *setupMessages)
 
 void nRF8001::begin(uint8_t reset_pin_arg,
                  uint8_t reqn_pin_arg,
-                 uint8_t rdyn_pin_arg)
+                 uint8_t rdyn_pin_arg,
+                 uint8_t pipeCount)
 {
     nrf_debug("Initializing");
     // Initialize data structures
@@ -103,7 +104,14 @@ void nRF8001::begin(uint8_t reset_pin_arg,
     SPI.setClockDivider(SPI_CLOCK_DIV16);
     SPI.begin();
 
-    managedPipes = NULL;
+    reconnect = false;
+
+    managedPipeCount = 0;
+    managedPipes = static_cast<pipe_data_t*>(
+        malloc(sizeof(pipe_data_t)*(pipeCount + 1)));
+    if (managedPipes != NULL) {
+        memset(managedPipes, 0, sizeof(pipe_data_t)*(pipeCount + 1));
+    }
 }
 
 void nRF8001::addressToString(char *str, uint8_t *address)
@@ -787,6 +795,13 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
         case NRF_DISCONNECTEDEVENT:
             connectionStatus = Disconnected;
             pipesOpen = 0;
+            pipesClosed = 0;
+
+            if (reconnect) {
+                nrf_debug("reconnecting");
+                connect();
+            }
+
             break;
         case NRF_DATACREDITEVENT:
             credits += rxEvent->msg.dataCredits;
@@ -802,6 +817,13 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
         case NRF_PIPEERROREVENT:
             break;
         case NRF_DATARECEIVEDEVENT:
+            nRFPipeNo pipeNo = rxEvent->msg.dataReceived.servicePipeNo;
+            if (managedPipes != NULL && managedPipes[pipeNo].valueArray != NULL) {
+                nrf_debug("write received data to managed pipe");
+                memcpy(managedPipes[pipeNo].valueArray,
+                    rxEvent->)
+            }
+
             break;
         case NRF_DATAACKEVENT:
             break;
@@ -962,7 +984,7 @@ nRFTxStatus nRF8001::getDeviceVersion()
     return transmitCommand(NRF_GETDEVICEVERSION_OP);
 }
 
-nRFTxStatus nRF8001::connect(uint16_t timeout, uint16_t advInterval)
+nRFTxStatus nRF8001::connectOnce(uint16_t timeout, uint16_t advInterval)
 {
     if (deviceState != Standby) {
         nrf_debug("device not in Standby state");
@@ -979,6 +1001,18 @@ nRFTxStatus nRF8001::connect(uint16_t timeout, uint16_t advInterval)
     cmd.content.connect.timeout = timeout;
     cmd.content.connect.advInterval = advInterval;
     return transmitReceive(&cmd, 0);
+}
+
+nRFTxStatus nRF8001::connectOnce()
+{
+    reconnect = false;
+    return connectOnce(0, 32);
+}
+
+nRFTxStatus nRF8001::connect()
+{
+    reconnect = true;
+    return connectOnce(0, 100);
 }
 
 nRFTxStatus nRF8001::radioReset()
@@ -1245,38 +1279,25 @@ nRFTxStatus nRF8001::sendDataNack(nRFPipeNo servicePipeNo, uint8_t errorCode)
     return transmitReceive(&cmd, 0);
 }
 
-// For pointer types
-template<class T>
-void nRFPipe<T>::begin(nRF8001 *nrf, nRFPipeNo servicePipeNo, nRFLen maxLengthIn)
+bool nRF8001::registerManagedPipe(nRFPipeNo pipeNo, pipe_data_t *pipe_data)
 {
-    maxLength = maxLengthIn;
-    nrfInstance = nrf;
-    pipeNo = servicePipeNo;
-    changedAfterLastRead = false;
-    memset(&value, 0, maxLengthIn); // necessary in C++?
+    if (managedPipes == NULL) {
+        nrf_debug("nRF8001 pipe data structure never allocated");
+        return false;
+    }
+    memcpy(&managedPipes[pipeNo], pipe_data, sizeof(pipe_data_t));
+    return true;
 }
 
-// For single types
-template<class T>
-void nRFPipe<T>::begin(nRF8001 *nrf, nRFPipeNo servicePipeNo)
+bool nRF8001::available()
 {
-    maxLength = sizeof(T);
-    nrfInstance = nrf;
-    pipeNo = servicePipeNo;
-    changedAfterLastRead = false;
-    memset(&value, 0, maxLength);
+    
 }
 
-// Apparently we need this to define class methods for templated classes
-// outside the .h file.
-template class nRFPipe<uint8_t>;
-template class nRFPipe<uint16_t>;
-template class nRFPipe<uint32_t>;
-template class nRFPipe<uint64_t>;
-template class nRFPipe<int8_t>;
-template class nRFPipe<int16_t>;
-template class nRFPipe<int32_t>;
-template class nRFPipe<int64_t>;
-template class nRFPipe<float>;
-template class nRFPipe<double>;
-template class nRFPipe<void *>;
+bool nRF8001::loop()
+{
+    // 100ms timeout
+    transmitReceive(0, 100);
+
+    return isConnected();
+}
