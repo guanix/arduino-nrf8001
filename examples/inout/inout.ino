@@ -22,10 +22,11 @@ void setup() {
   Serial.println("nRF8001 test");
   
   // Pin numbers for Nordic's Arduino shield that adapts to their dev kit modules
+  // the order is: reset, reqn, rdyn
   nrf.begin(4, 10, 3, NUMBER_OF_PIPES);
   
-  inChar.begin(nrf, 1);      // 1 is the pipe number
-  outChar.begin(nrf, 2);
+  inChar.begin(nrf, PIPE_SAMPLE_SERVICE_IN_CHARACTERISTIC_RX_ACK_AUTO);      // 1 is the pipe number
+  outChar.begin(nrf, PIPE_SAMPLE_SERVICE_OUT_CHARACTERISTIC_TX);
   
   nrf.setup(NB_SETUP_MESSAGES, setup_msgs);
   
