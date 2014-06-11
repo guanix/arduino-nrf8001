@@ -107,6 +107,7 @@ void nRF8001::begin(uint8_t reset_pin_arg,
     reconnect = false;
 
     managedPipeCount = 0;
+    nrf_debug("allocating memory for managed pipe_data");
     managedPipes = static_cast<pipe_data_t*>(
         malloc(sizeof(pipe_data_t)*(pipeCount + 1)));
     if (managedPipes != NULL) {
@@ -603,6 +604,8 @@ void nRF8001::debugEvent(nRFEvent *event)
 // function with a NULL argument.
 nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
 {
+    nRFPipeNo pipeNo;
+
     // Buffer that we will receive into
     uint8_t rxBuffer[sizeof(nRFEvent)];
     nRFEvent *rxEvent = (nRFEvent *)rxBuffer;
@@ -795,10 +798,13 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
         case NRF_DISCONNECTEDEVENT:
             connectionStatus = Disconnected;
             pipesOpen = 0;
-            pipesClosed = 0;
+
+            nrf_debug("disconnected");
 
             if (reconnect) {
                 nrf_debug("reconnecting");
+                // this could potentially trigger a lot of recursion...
+                // we can change the implementation without changing the API
                 connect();
             }
 
@@ -817,13 +823,16 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
         case NRF_PIPEERROREVENT:
             break;
         case NRF_DATARECEIVEDEVENT:
-            nRFPipeNo pipeNo = rxEvent->msg.dataReceived.servicePipeNo;
+            pipeNo = rxEvent->msg.dataReceived.servicePipeNo;
+
+            // If this is a managed pipe, write the data into 
             if (managedPipes != NULL && managedPipes[pipeNo].valueArray != NULL) {
                 nrf_debug("write received data to managed pipe");
                 memcpy(managedPipes[pipeNo].valueArray,
-                    rxEvent->)
+                    rxEvent->msg.dataReceived.data,
+                    managedPipes[pipeNo].maxLength);
+                *managedPipes[pipeNo].changedAfterLastRead = true;
             }
-
             break;
         case NRF_DATAACKEVENT:
             break;
@@ -839,36 +848,7 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
 
 // Informational functions
 
-uint8_t nRF8001::creditsAvailable()
-{
-    return credits;
-}
-
-uint8_t nRF8001::isConnected() {
-    return connectionStatus == Connected;
-}
-
-nRFConnectionStatus nRF8001::getConnectionStatus()
-{
-    return connectionStatus;
-}
-
 // Receive functions
-
-nRFTxStatus nRF8001::poll(uint16_t timeout)
-{
-    return transmitReceive(0, timeout);
-}
-
-nRFTxStatus nRF8001::poll()
-{
-    return transmitReceive(0, 0);
-}
-
-uint8_t nRF8001::isPipeOpen(nRFPipeNo servicePipeNo)
-{
-    return (pipesOpen & ((uint64_t)1) << servicePipeNo) != 0;
-}
 
 // Transmit functions
 
@@ -1227,6 +1207,8 @@ nRFTxStatus nRF8001::sendData(nRFPipeNo servicePipeNo,
         return DataTooLong;
     }
 
+    nrf_debug("sendData");
+
     nRFCommand cmd;
     cmd.command = NRF_SENDDATA_OP;
     cmd.length = dataLength + 2;
@@ -1291,7 +1273,13 @@ bool nRF8001::registerManagedPipe(nRFPipeNo pipeNo, pipe_data_t *pipe_data)
 
 bool nRF8001::available()
 {
-    
+    if (digitalRead(rdyn_pin) == HIGH) {
+        // no event pending
+        return isConnected();
+    }
+
+    transmitReceive(0, 50);
+    return isConnected();
 }
 
 bool nRF8001::loop()

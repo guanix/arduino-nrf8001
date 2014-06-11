@@ -2,6 +2,7 @@
 #define _NRF8001_H
 
 #include <Arduino.h>
+#include <assert.h>
 
 #ifndef NRF_DEBUG
 #define NRF_DEBUG 1
@@ -133,6 +134,35 @@ class nRF8001
                                uint8_t errorCode);
 };
 
+inline uint8_t nRF8001::isConnected() {
+    return connectionStatus == Connected;
+}
+
+inline uint8_t nRF8001::creditsAvailable()
+{
+    return credits;
+}
+
+inline nRFConnectionStatus nRF8001::getConnectionStatus()
+{
+    return connectionStatus;
+}
+
+inline nRFTxStatus nRF8001::poll(uint16_t timeout)
+{
+    return transmitReceive(0, timeout);
+}
+
+inline nRFTxStatus nRF8001::poll()
+{
+    return transmitReceive(0, 0);
+}
+
+inline uint8_t nRF8001::isPipeOpen(nRFPipeNo servicePipeNo)
+{
+    return (pipesOpen & ((uint64_t)1) << servicePipeNo) != 0;
+}
+
 // A characteristic that we will set up
 template<class T, int howMany = 1>
 class nRFPipe {
@@ -140,15 +170,21 @@ public:
     void begin(nRF8001 &nrf, nRFPipeNo pipeNo);
 
     bool changed();
-    void write(T newval);
+    nRFTxStatus send(T newval);
+    nRFTxStatus send(T* newval);
     T read(void);
-    void set(T newval);
+    void read(T* arr);
+    nRFTxStatus set(T newval);
+    nRFTxStatus ack();
+    nRFTxStatus nack();
+    bool open();
 
 private:
     bool changedAfterLastRead;
     T valueArray[howMany];
     nRFLen maxLength;
     nRFPipeNo pipeNo;
+    nRF8001 *nrfInstance;
 };
 
 // For obscure C++ reasons this has to be in the header file.
@@ -157,6 +193,7 @@ private:
 template<class T, int howMany>
 void nRFPipe<T, howMany>::begin(nRF8001 &nrf, nRFPipeNo servicePipeNo)
 {
+    assert(sizeof(T)*howMany <= NRF_DATA_LENGTH);
     maxLength = sizeof(T)*howMany;
     pipeNo = servicePipeNo;
     changedAfterLastRead = false;
@@ -167,7 +204,47 @@ void nRFPipe<T, howMany>::begin(nRF8001 &nrf, nRFPipeNo servicePipeNo)
     pipe_data.maxLength = sizeof(T)*howMany;
     pipe_data.changedAfterLastRead = &changedAfterLastRead;
 
+    nrfInstance = &nrf;
+
     nrf.registerManagedPipe(servicePipeNo, &pipe_data);
+}
+
+template<class T, int howMany>
+inline bool nRFPipe<T, howMany>::changed()
+{
+    return changedAfterLastRead;
+}
+
+template<class T, int howMany>
+inline T nRFPipe<T, howMany>::read(void)
+{
+    changedAfterLastRead = false;
+    return valueArray[0];
+}
+
+template<class T, int howMany>
+inline void nRFPipe<T, howMany>::read(T *arr)
+{
+    // TODO: endianness
+    memcpy(arr, valueArray, sizeof(T)*howMany);
+}
+
+template<class T, int howMany>
+inline nRFTxStatus nRFPipe<T, howMany>::send(T val)
+{
+    return nrfInstance->sendData(pipeNo, sizeof(T), &val);
+}
+
+template<class T, int howMany>
+inline nRFTxStatus nRFPipe<T, howMany>::send(T* val)
+{
+    return nrfInstance->sendData(pipeNo, sizeof(T)*howMany, val);
+}
+
+template<class T, int howMany>
+inline bool nRFPipe<T, howMany>::open()
+{
+    return nrfInstance->isPipeOpen(pipeNo);
 }
 
 #endif /* _NRF8001_H */
