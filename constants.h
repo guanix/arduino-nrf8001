@@ -99,7 +99,7 @@
 enum nRFDeviceState {
     Initial,
     PreSetup,
-    Setup,
+    nRFSetupState,
     Standby,
     Active,
     Test,

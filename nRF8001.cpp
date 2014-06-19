@@ -21,7 +21,7 @@ nRFCmd nRF8001::setup(hal_aci_data_t setup_msgs[], uint8_t nb_setup_msgs)
     for (;;) {
         nrf_debug("Calling transmitReceive...");
         transmitReceive(0, 0);
-        if (deviceState == Setup || deviceState == PreSetup) {
+        if (deviceState == nRFSetupState || deviceState == PreSetup) {
             // Start the setup process
             nextSetupMessage = 0;
             break;
@@ -744,7 +744,7 @@ nRFTxStatus nRF8001::transmitReceive(nRFCommand *txCmd, uint16_t timeout)
                     deviceState = Test;
                     break;
                 case 0x02:
-                    deviceState = Setup;
+                    deviceState = nRFSetupState;
                     break;
                 case 0x03:
                     if (deviceState == Initial) {
