@@ -111,6 +111,16 @@ timeout, and every 2 seconds or so, we read a new temperature and send
 that out as a heart rate. If the connection is disconnected, we call
 `nRF8001::connect` again to wait for a new connection.
 
+## Blend Micro
+
+This code works with Red Bear Lab's [Blend Micro](http://redbearlab.com/blendmicro/).
+
+Use the following pin assignments
+
+* RESET on digital pin 4
+* REQN on digital pin 6
+* RDYN on digital pin 7
+
 ## License
 Copyright © 2012 Guan Yang
 
