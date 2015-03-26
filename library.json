@@ -1,0 +1,12 @@
+{
+  "name": "NRF8001",
+  "keywords": "spi, bluetooth, driver",
+  "description": "Arduino library for the Nordic nRF8001 Bluetooth Low Energy chip",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com//guanix/arduino-nrf8001.git"
+  },
+  "frameworks": "arduino",
+  "platforms": "atmelavr"
+}
