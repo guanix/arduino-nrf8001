@@ -5,7 +5,7 @@
   "repository":
   {
     "type": "git",
-    "url": "https://github.com//guanix/arduino-nrf8001.git"
+    "url": "https://github.com/guanix/arduino-nrf8001.git"
   },
   "frameworks": "arduino",
   "platforms": "atmelavr"
